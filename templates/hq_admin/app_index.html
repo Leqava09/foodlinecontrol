@@ -1,0 +1,26 @@
+{% extends "admin/app_index.html" %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+  /* HQ Home link styling */
+  .hq-home-link {
+    display: block;
+    padding: 5px 0;
+    font-size: 0.9em;
+  }
+  .hq-home-link a {
+    color: #667eea;
+    font-weight: bold;
+    text-decoration: none;
+  }
+  .hq-home-link a:hover {
+    text-decoration: underline;
+  }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="hq-home-link"><a href="/hq/">HQ Home</a> ›</div>
+{{ block.super }}
+{% endblock %}

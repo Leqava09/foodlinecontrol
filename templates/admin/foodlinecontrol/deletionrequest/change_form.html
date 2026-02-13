@@ -1,0 +1,113 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .action-section {
+        background: #f8f9fa;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+    }
+    .action-section h3 {
+        margin-top: 0;
+        color: #495057;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 10px;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 15px;
+        margin-top: 15px;
+    }
+    .action-btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+    }
+    .btn-approve-action {
+        background: #28a745;
+        color: white;
+    }
+    .btn-approve-action:hover {
+        background: #218838;
+    }
+    .btn-reject-action {
+        background: #dc3545;
+        color: white;
+    }
+    .btn-reject-action:hover {
+        background: #c82333;
+    }
+    .password-field {
+        margin-top: 15px;
+    }
+    .password-field label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    .password-field input {
+        padding: 10px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        width: 300px;
+    }
+    .notes-field {
+        margin-top: 15px;
+    }
+    .notes-field label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    .notes-field textarea {
+        padding: 10px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        width: 100%;
+        height: 80px;
+    }
+</style>
+{% endblock %}
+
+{% block after_field_sets %}
+{{ block.super }}
+
+{% if show_action_buttons %}
+<div class="action-section">
+    <h3>🔐 Take Action on This Request</h3>
+    <p>
+        <strong>Requested by:</strong> {{ original.requested_by }}<br>
+        <strong>Item to delete:</strong> {{ original.object_repr }}<br>
+        <strong>Reason:</strong> {{ original.reason|default:"No reason provided" }}
+    </p>
+    
+    <div class="notes-field">
+        <label for="admin_notes">Admin Notes (Optional):</label>
+        <textarea name="admin_notes" id="admin_notes" 
+                  placeholder="Add any notes about your decision..."></textarea>
+    </div>
+    
+    <div class="password-field">
+        <label for="action_password">Enter Your Password to Confirm Action:</label>
+        <input type="password" name="action_password" id="action_password" 
+               placeholder="Password required for both approve and reject">
+    </div>
+    
+    <div class="action-buttons">
+        <button type="submit" name="action_type" value="approve" class="action-btn btn-approve-action">
+            ✅ Approve & Delete Item
+        </button>
+        <button type="submit" name="action_type" value="reject" class="action-btn btn-reject-action">
+            ❌ Reject Request
+        </button>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

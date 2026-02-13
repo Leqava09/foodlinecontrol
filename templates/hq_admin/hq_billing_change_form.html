@@ -1,0 +1,87 @@
+{% extends "admin/costing/billingdocumentheader/import_change_form.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    /* Style the inline to look better */
+    .billing-line-items-inline {
+        margin: 20px 0;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background: #f9f9f9;
+    }
+    .billing-line-items-inline h2 {
+        background: #417690;
+        color: white;
+        padding: 10px 15px;
+        margin: 0;
+        font-size: 14px;
+    }
+    .billing-line-items-inline .inline-related {
+        padding: 15px;
+    }
+    
+    /* Make inline table look better */
+    #line_items-group table {
+        width: 100%;
+    }
+    #line_items-group th {
+        background-color: #f0f0f0;
+        padding: 8px;
+        text-align: left;
+        font-weight: 600;
+    }
+    #line_items-group td {
+        padding: 6px 8px;
+        vertical-align: middle;
+    }
+    #line_items-group select {
+        min-width: 150px;
+    }
+    #line_items-group input[type="number"],
+    #line_items-group input[type="text"] {
+        width: 100px;
+    }
+</style>
+{% endblock %}
+
+{% block after_related_objects %}
+{{ block.super }}
+<script>
+(function($) {
+    $(document).ready(function() {
+        // Find the inline and the Financials fieldset
+        var inline = $('#line_items-group');
+        var datesFieldset = $('fieldset').filter(function() {
+            return $(this).find('h2, .grp-collapse-handler').text().indexOf('Dates') !== -1;
+        });
+        var financialsFieldset = $('fieldset').filter(function() {
+            return $(this).find('h2, .grp-collapse-handler').text().indexOf('Financials') !== -1;
+        });
+        
+        // If we found both, move the inline between them
+        if (inline.length && datesFieldset.length && financialsFieldset.length) {
+            // Wrap inline in a nice container
+            inline.addClass('billing-line-items-inline');
+            
+            // Insert after Dates fieldset (before Financials)
+            inline.insertAfter(datesFieldset);
+        }
+        
+        // Also handle grappelli fieldsets
+        var grpDatesFieldset = $('.grp-module').filter(function() {
+            return $(this).find('h2').text().indexOf('Dates') !== -1;
+        });
+        var grpFinancialsFieldset = $('.grp-module').filter(function() {
+            return $(this).find('h2').text().indexOf('Financials') !== -1;
+        });
+        
+        if (inline.length && grpDatesFieldset.length && grpFinancialsFieldset.length) {
+            inline.addClass('billing-line-items-inline');
+            inline.insertAfter(grpDatesFieldset);
+        }
+    });
+})(django.jQuery || jQuery);
+</script>
+{% endblock %}

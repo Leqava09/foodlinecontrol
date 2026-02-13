@@ -1,0 +1,204 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .protected-delete-form {
+        max-width: 600px;
+        margin: 20px 0;
+        padding: 20px;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+    }
+    .protected-delete-form h2 {
+        color: #ba2121;
+        margin-bottom: 20px;
+        font-size: 18px;
+    }
+    .warning-box {
+        background: #fff3cd;
+        border: 1px solid #ffc107;
+        border-radius: 4px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    .warning-box .icon {
+        font-size: 24px;
+        margin-right: 10px;
+    }
+    .object-info {
+        background: #f5f5f5;
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    .object-info strong {
+        color: #333;
+    }
+    .form-row {
+        margin-bottom: 15px;
+    }
+    .form-row label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+        color: #333;
+    }
+    .form-row input[type="password"],
+    .form-row textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+    .form-row textarea {
+        height: 100px;
+        resize: vertical;
+    }
+    .button-row {
+        margin-top: 20px;
+        display: flex;
+        gap: 10px;
+    }
+    .btn-delete {
+        background: #ba2121;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .btn-delete:hover {
+        background: #a01b1b;
+    }
+    .btn-cancel {
+        background: #666;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .btn-cancel:hover {
+        background: #555;
+    }
+    .btn-request {
+        background: #0d6efd;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .btn-request:hover {
+        background: #0b5ed7;
+    }
+    .security-notice {
+        background: #e7f3ff;
+        border: 1px solid #0d6efd;
+        border-radius: 4px;
+        padding: 15px;
+        margin-bottom: 20px;
+        font-size: 13px;
+    }
+    .security-notice .icon {
+        margin-right: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="protected-delete-form">
+    {% if is_superuser %}
+    {# Superuser: Password confirmation required #}
+    <h2>⚠️ Permanently Delete Archived Item</h2>
+    
+    <div class="warning-box">
+        <span class="icon">🔒</span>
+        <strong>Extra Security Required</strong><br>
+        You are about to permanently delete an archived item. 
+        This action cannot be undone. Please re-enter your password to confirm.
+    </div>
+    
+    <div class="object-info">
+        <strong>{{ object_name|capfirst }}:</strong> {{ object }}
+    </div>
+    
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="form-row">
+            <label for="password">Enter Your Password to Confirm:</label>
+            <input type="password" name="password" id="password" required 
+                   placeholder="Enter your password" autofocus>
+        </div>
+        
+        <div class="security-notice">
+            <span class="icon">🛡️</span>
+            <strong>Security Note:</strong> This extra verification is required because archived items 
+            are protected from accidental deletion. Only superusers can permanently delete archived records.
+        </div>
+        
+        <div class="button-row">
+            <button type="submit" name="confirm_delete" value="yes" class="btn-delete">
+                🗑️ Confirm Delete
+            </button>
+            <button type="submit" name="confirm_delete" value="no" class="btn-cancel">
+                Cancel
+            </button>
+        </div>
+    </form>
+    
+    {% else %}
+    {# Non-superuser: Request deletion #}
+    <h2>📋 Request Deletion of Archived Item</h2>
+    
+    <div class="warning-box">
+        <span class="icon">🔐</span>
+        <strong>Superuser Approval Required</strong><br>
+        You do not have permission to permanently delete archived items. 
+        Your request will be sent to a superuser for approval.
+    </div>
+    
+    <div class="object-info">
+        <strong>{{ object_name|capfirst }}:</strong> {{ object }}
+    </div>
+    
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="form-row">
+            <label for="reason">Reason for Deletion Request:</label>
+            <textarea name="reason" id="reason" 
+                      placeholder="Please explain why this archived item should be permanently deleted..."
+                      required></textarea>
+        </div>
+        
+        <div class="security-notice">
+            <span class="icon">📧</span>
+            <strong>What happens next:</strong> Your request will be added to the Deletion Requests queue. 
+            A superuser will review your request and decide whether to approve or reject it.
+        </div>
+        
+        <div class="button-row">
+            <button type="submit" name="submit_request" value="yes" class="btn-request">
+                📤 Submit Request
+            </button>
+            <button type="submit" name="submit_request" value="no" class="btn-cancel">
+                Cancel
+            </button>
+        </div>
+    </form>
+    {% endif %}
+</div>
+
+<p>
+    <a href="javascript:history.back();">← Back</a>
+</p>
+{% endblock %}

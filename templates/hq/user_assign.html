@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - FoodLineControl HQ</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+        .header h1 { font-size: 1.8em; }
+        .back-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .back-btn:hover { background: rgba(255,255,255,0.3); }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .user-info {
+            background: #f8f9ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .user-info h3 { color: #667eea; margin-bottom: 5px; }
+        .user-info p { color: #666; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .form-group select:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 5px;
+        }
+        .checkbox-group input { width: auto; }
+        .checkbox-group label { margin-bottom: 0; }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+        .help-text {
+            margin-top: 10px;
+            padding: 10px;
+            background: #fff8e1;
+            border-radius: 5px;
+            font-size: 0.9em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{ title }}</h1>
+            <a href="{% url 'hq_users' %}" class="back-btn">← Back to Users</a>
+        </div>
+        
+        <div class="card">
+            <div class="user-info">
+                <h3>👤 {{ target_user.username }}</h3>
+                <p>
+                    {% if target_user.first_name %}{{ target_user.first_name }} {{ target_user.last_name }}{% endif %}
+                    {% if target_user.email %} • {{ target_user.email }}{% endif %}
+                </p>
+            </div>
+            
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="is_hq_user" name="is_hq_user" 
+                               {% if user_site and user_site.is_hq_user %}checked{% endif %}
+                               onchange="toggleSiteSelect()">
+                        <label for="is_hq_user">🌍 HQ Admin (access to all sites)</label>
+                    </div>
+                </div>
+                
+                <div class="form-group" id="site-select-group">
+                    <label for="site_id">Assigned Site</label>
+                    <select id="site_id" name="site_id">
+                        <option value="">-- Select a site --</option>
+                        {% for site in sites %}
+                        <option value="{{ site.id }}" {% if user_site and user_site.assigned_site_id == site.id %}selected{% endif %}>
+                            {{ site.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="help-text">
+                    <strong>HQ Admin:</strong> Can access HQ dashboard and ALL site admins.<br>
+                    <strong>Site User:</strong> Can only access their assigned site's admin.
+                </div>
+                
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">Save Assignment</button>
+                    <a href="{% url 'hq_users' %}" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        function toggleSiteSelect() {
+            var isHQ = document.getElementById('is_hq_user').checked;
+            var siteGroup = document.getElementById('site-select-group');
+            siteGroup.style.display = isHQ ? 'none' : 'block';
+        }
+        toggleSiteSelect();
+    </script>
+</body>
+</html>

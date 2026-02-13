@@ -1,0 +1,189 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block title %}Manufacturing Report{% endblock %}
+
+{% block breadcrumbs %}
+<ul class="grp-breadcrumb">
+    <li><a href="{% url 'admin:index' %}">Home</a></li>
+    <li><a href="{% url 'admin:app_list' 'manufacturing' %}">Manufacturing</a></li>
+    <li>Manufacturing Report</li>
+</ul>
+{% endblock %}
+
+{% block content_title %}{% endblock %}
+
+{% block content %}
+<style>
+    .report-container { padding: 5px 15px; }
+    .report-section { background: #fff; border-radius: 6px; padding: 10px 15px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .report-section h2 { margin-top: 0; margin-bottom: 8px; color: #417690; border-bottom: 2px solid #417690; padding-bottom: 6px; font-size: 15px; }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 8px; }
+    .summary-card { background: #f8f9fa; padding: 10px; border-radius: 5px; text-align: center; border-left: 4px solid #417690; }
+    .summary-card.manufactured { border-left-color: #6c757d; }
+    .summary-card.incubation { border-left-color: #ffc107; }
+    .summary-card.awaiting { border-left-color: #fd7e14; }
+    .summary-card.certified { border-left-color: #28a745; }
+    .summary-card.ready { border-left-color: #17a2b8; }
+    .summary-card.dispatched { border-left-color: #6c757d; }
+    .summary-card .status-name { font-weight: bold; color: #333; font-size: 12px; text-transform: capitalize; }
+    .summary-card .count { font-size: 22px; font-weight: bold; color: #417690; margin: 5px 0; }
+    .summary-card .qty { font-size: 11px; color: #666; }
+    .filter-bar { background: #f5f5f5; padding: 10px 12px; border-radius: 5px; margin-bottom: 0; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .filter-bar label { font-weight: bold; margin-right: 4px; font-size: 12px; }
+    .filter-bar select, .filter-bar input { padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; }
+    .filter-bar .btn-group { display: flex; gap: 8px; margin-left: auto; }
+    .filter-bar button { background: #417690; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; min-width: 60px; font-size: 12px; }
+    .filter-bar button:hover { background: #205067; }
+    .filter-bar .clear-btn { background: #6c757d; text-decoration: none; color: white; padding: 6px 16px; border-radius: 4px; display: inline-block; min-width: 60px; text-align: center; font-size: 12px; }
+    .filter-bar .clear-btn:hover { background: #5a6268; }
+    .batch-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+    .batch-table th, .batch-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #ddd; }
+    .batch-table th { background: #f8f9fa; font-weight: bold; color: #333; }
+    .batch-table tr:hover { background: #f5f5f5; }
+    .batch-table .qty { text-align: right; }
+    .batch-table .total-row { background: #e9ecef; font-weight: bold; }
+    .batch-table .total-row td { border-top: 2px solid #417690; }
+    .status-badge { padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; white-space: nowrap; }
+    .status-badge.manufactured { background: #e2e3e5; color: #383d41; }
+    .status-badge.incubation { background: #fff3cd; color: #856404; }
+    .status-badge.awaiting { background: #ffe5d0; color: #c45e00; }
+    .status-badge.certified { background: #d4edda; color: #155724; }
+    .status-badge.ready { background: #d1ecf1; color: #0c5460; }
+    .status-badge.dispatched { background: #e2e3e5; color: #383d41; }
+    .status-badge.failed { background: #f8d7da; color: #721c24; }
+    .date-highlight { font-weight: bold; }
+    .date-today { color: #28a745; }
+    .date-overdue { color: #dc3545; }
+    .date-upcoming { color: #fd7e14; }
+    .no-data { color: #999; font-style: italic; padding: 20px; text-align: center; }
+    .batch-link { color: #417690; text-decoration: none; }
+    .batch-link:hover { text-decoration: underline; }
+</style>
+
+<div class="report-container">
+    <!-- Filters -->
+    <div class="report-section">
+        <form method="get" class="filter-bar">
+            {% if is_hq_context %}
+            <div>
+                <label for="site">Site:</label>
+                <select name="site" id="site">
+                    <option value="">All Sites</option>
+                    {% for site_id, site_name in site_choices %}
+                    <option value="{{ site_id }}" {% if current_site_filter|stringformat:"s" == site_id|stringformat:"s" %}selected{% endif %}>{{ site_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div>
+                <label for="status">Status:</label>
+                <select name="status" id="status">
+                    <option value="">All Statuses</option>
+                    {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="date_from">Cert. Date From:</label>
+                <input type="date" name="date_from" id="date_from" value="{{ date_from }}">
+            </div>
+            <div>
+                <label for="date_to">To:</label>
+                <input type="date" name="date_to" id="date_to" value="{{ date_to }}">
+            </div>
+            <div class="btn-group">
+                <button type="submit">Filter</button>
+                <a href="?" class="clear-btn">Clear</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="report-section">
+        <h2>📊 Status Summary</h2>
+        <div class="summary-grid">
+            {% for item in status_summary %}
+            <div class="summary-card 
+                {% if 'manufactured' in item.status|lower %}manufactured
+                {% elif 'incubation' in item.status|lower %}incubation
+                {% elif 'awaiting' in item.status|lower %}awaiting
+                {% elif 'certified' in item.status|lower %}certified
+                {% elif 'ready' in item.status|lower %}ready
+                {% elif 'dispatched' in item.status|lower %}dispatched
+                {% elif 'failed' in item.status|lower %}failed
+                {% endif %}">
+                <div class="status-name">{{ item.display_status }}</div>
+                <div class="count">{{ item.batch_count }}</div>
+                <div class="qty">Shift: {{ item.total_shift|default:0|floatformat:0 }}</div>
+                <div class="qty">Ready: {{ item.total_ready|default:0|floatformat:0 }}</div>
+            </div>
+            {% empty %}
+            <div class="no-data">No batches found</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- All Batches Detail -->
+    <div class="report-section">
+        <h2>📋 All Batches ({{ all_batches|length }})</h2>
+        {% if all_batches %}
+        <table class="batch-table">
+            <thead>
+                <tr>
+                    <th>Batch</th>
+                    <th>Product</th>
+                    <th>Production Date</th>
+                    <th>Status</th>
+                    <th>Incub. End</th>
+                    <th>NSI Submit</th>
+                    <th>Cert. Date</th>
+                    <th class="qty">Shift Total</th>
+                    <th class="qty">Ready Dispatch</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for batch in all_batches %}
+                <tr>
+                    <td><a class="batch-link" href="/manufacturing/batch/{{ batch.site.slug }}/{{ batch.production_date|date:'Ymd' }}/detail/">{{ batch.batch_number }}</a></td>
+                    <td>{{ batch.product.product_name|default:"-" }}</td>
+                    <td>{{ batch.production_date|date:"d-m-Y"|default:"-" }}</td>
+                    <td>
+                        <span class="status-badge 
+                            {% if 'manufactured' in batch.status|lower %}manufactured
+                            {% elif 'incubation' in batch.status|lower %}incubation
+                            {% elif 'awaiting' in batch.status|lower %}awaiting
+                            {% elif 'certified' in batch.status|lower %}certified
+                            {% elif 'ready' in batch.status|lower %}ready
+                            {% elif 'dispatched' in batch.status|lower %}dispatched
+                            {% elif 'failed' in batch.status|lower %}failed
+                            {% endif %}">
+                            {{ batch.display_status }}
+                        </span>
+                    </td>
+                    <td>{{ batch.incubation_end|date:"d-m-Y"|default:"-" }}</td>
+                    <td>{{ batch.nsi_submission_date|date:"d-m-Y"|default:"-" }}</td>
+                    <td class="date-highlight 
+                        {% if batch.certification_date and batch.certification_date < today %}date-overdue
+                        {% elif batch.certification_date == today %}date-today
+                        {% endif %}">
+                        {{ batch.certification_date|date:"d-m-Y"|default:"-" }}
+                    </td>
+                    <td class="qty">{{ batch.shift_total|floatformat:0 }}</td>
+                    <td class="qty">{{ batch.ready_dispatch|floatformat:0 }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-row">
+                    <td colspan="7"><strong>TOTAL</strong></td>
+                    <td class="qty">{{ total_shift|floatformat:0 }}</td>
+                    <td class="qty">{{ total_ready|floatformat:0 }}</td>
+                </tr>
+            </tbody>
+        </table>
+        {% else %}
+        <div class="no-data">No batches found matching the filters</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

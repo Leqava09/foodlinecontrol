@@ -1,0 +1,78 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+<script>
+(function() {
+    // Wait for Django's jQuery to be available
+    var checkJQuery = setInterval(function() {
+        if (typeof django !== 'undefined' && typeof django.jQuery !== 'undefined') {
+            clearInterval(checkJQuery);
+            
+            var $ = django.jQuery;
+            
+            $(document).ready(function() {
+                // Preserve mode parameter through form submission
+                var urlParams = new URLSearchParams(window.location.search);
+                var mode = urlParams.get('mode');
+                if (mode === 'import') {
+                    // Add hidden input to preserve mode on form submission
+                    if ($('input[name="_mode"]').length === 0) {
+                        $('<input>').attr({
+                            type: 'hidden',
+                            name: '_mode',
+                            value: 'import'
+                        }).appendTo('form');
+                    }
+                }
+                
+                var siteSelect = $('#id_import_source_site');
+                var incidentSelect = $('#id_import_source_incident');
+                
+                // Only run if we have these fields (import mode)
+                if (siteSelect.length && incidentSelect.length) {
+                    // When site changes, load incidents for that site
+                    siteSelect.change(function() {
+                        var siteId = $(this).val();
+                        
+                        if (!siteId) {
+                            incidentSelect.empty();
+                            incidentSelect.append('<option value="">---------</option>');
+                            return;
+                        }
+                        
+                        // Fetch incidents from the selected site
+                        // Get the current path to build correct URL
+                        var currentPath = window.location.pathname;
+                        var baseUrl = currentPath.replace(/\/add\/.*$/, '/');
+                        var url = baseUrl + 'site-incidents/?site_id=' + siteId;
+                        
+                        $.ajax({
+                            url: url,
+                            dataType: 'json',
+                            success: function(data) {
+                                incidentSelect.empty();
+                                incidentSelect.append('<option value="">---------</option>');
+                                
+                                if (data && data.length > 0) {
+                                    $.each(data, function(i, incident) {
+                                        var option = $('<option></option>')
+                                            .attr('value', incident.id)
+                                            .text(incident.display);
+                                        incidentSelect.append(option);
+                                    });
+                                }
+                            },
+                            error: function() {
+                                alert('Error loading incidents for selected site');
+                            }
+                        });
+                    });
+                }
+            });
+        }
+    }, 10);
+})();
+</script>
+{% endblock %}

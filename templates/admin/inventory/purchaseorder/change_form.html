@@ -1,0 +1,25 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls static %}
+
+{% block submit_buttons_bottom %}
+  <div style="padding: 10px 0; margin-bottom: 10px; border-top: 1px solid #ddd;">
+    {% if original %}
+      <a href="{% url 'inventory:po_document_preview' original.pk %}" target="_blank"
+         style="display: inline-block; padding: 8px 15px; background: #417690; color: white; border-radius: 4px; text-decoration: none; font-weight: bold; margin-right: 10px;">
+        <i class="fa fa-eye" style="margin-right: 5px;"></i>Preview PDF
+      </a>
+      <a href="{% url 'inventory:email_po_document' original.pk %}" target="_blank"
+         style="display: inline-block; padding: 8px 15px; background: #28a745; color: white; border-radius: 4px; text-decoration: none; font-weight: bold;">
+        <i class="fa fa-envelope" style="margin-right: 5px;"></i>Email PO
+      </a>
+    {% else %}
+      <span style="display: inline-block; padding: 8px 15px; background: #ccc; color: #999; border-radius: 4px; font-weight: bold; margin-right: 10px; title='Save first to enable';">
+        <i class="fa fa-eye" style="margin-right: 5px;"></i>Preview PDF
+      </span>
+      <span style="display: inline-block; padding: 8px 15px; background: #ccc; color: #999; border-radius: 4px; font-weight: bold;" title='Save first to enable'>
+        <i class="fa fa-envelope" style="margin-right: 5px;"></i>Email PO
+      </span>
+    {% endif %}
+  </div>
+  {{ block.super }}
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <style>
+    {% if admin_background_url %}
+    body {
+      background-image: url('{{ admin_background_url }}') !important;
+      background-size: 900px auto !important;
+      background-position: center center !important;
+      background-repeat: no-repeat !important;
+      background-attachment: fixed !important;
+    }
+    #content {
+      background: transparent !important;
+    }
+    .widget {
+      background: rgba(255, 255, 255, 0.92) !important;
+      backdrop-filter: blur(2px);
+    }
+    {% endif %}
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="dashboard-widgets">
+    {% for app in app_list %}
+      <div class="widget">
+        <h2 class="widget-heading">
+          {% if "Authentication" in app.name %}
+            <i class="fas fa-lock"></i>
+          {% elif "Billing" in app.name %}
+            <i class="fas fa-receipt"></i>
+          {% elif "Commercial" in app.name %}
+            <i class="fas fa-handshake"></i>
+          {% elif "Compliance" in app.name %}
+            <i class="fas fa-clipboard-check"></i>
+          {% elif "Costing" in app.name %}
+            <i class="fas fa-calculator"></i>
+          {% elif "Inventory" in app.name %}
+            <i class="fas fa-boxes"></i>
+          {% elif "Manufacturing" in app.name %}
+            <i class="fas fa-industry"></i>
+          {% elif "Incident" in app.name %}
+            <i class="fas fa-exclamation-triangle"></i>
+          {% elif "Product" in app.name %}
+            <i class="fas fa-cube"></i>
+          {% elif "Transport" in app.name %}
+            <i class="fas fa-truck"></i>
+          {% elif "Production" in app.name %}
+            <i class="fas fa-cogs"></i>
+          {% elif "Human Resources" in app.name %}
+            <i class="fas fa-users"></i>
+          {% else %}
+            <i class="fas fa-folder"></i>
+          {% endif %}
+          {{ app.name }}
+        </h2>
+        <ul class="widget-list">
+          {% for model in app.models %}
+            <li>
+              <a href="{{ model.admin_url }}">{{ model.name }}</a>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endfor %}
+  </div>
+{% endblock %}
+

@@ -1,0 +1,45 @@
+{% extends "admin/index.html" %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+  /* HQ Home link styling */
+  .hq-home-link {
+    display: block;
+    padding: 5px 0;
+    font-size: 0.9em;
+  }
+  .hq-home-link a {
+    color: #667eea;
+    font-weight: bold;
+    text-decoration: none;
+  }
+  .hq-home-link a:hover {
+    text-decoration: underline;
+  }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Fix the "Home" link in breadcrumbs to go to HQ Dashboard
+    var breadcrumbs = document.querySelectorAll('#grp-breadcrumb-menu a, .grp-breadcrumb a, .breadcrumbs a');
+    breadcrumbs.forEach(function(link) {
+        if (link.textContent.trim() === 'Home' || link.href.endsWith('/hq/admin/')) {
+            link.href = '/hq/';
+            link.textContent = 'HQ Dashboard';
+        }
+    });
+});
+</script>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="hq-home-link"><a href="/hq/">HQ Home</a> ›</div>
+<ul class="grp-horizontal-list" id="grp-breadcrumb-menu">
+    <li><a href="/hq/admin/">Home</a></li>
+    <li>› HQ Management</li>
+</ul>
+{% endblock %}
+
+{% block content %}
+{{ block.super }}
+{% endblock %}

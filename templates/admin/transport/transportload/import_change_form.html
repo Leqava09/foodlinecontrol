@@ -1,0 +1,253 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .import-data-button {
+        background-color: #417690;
+        color: white;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-top: 10px;
+        margin-bottom: 20px;
+        font-size: 13px;
+    }
+    .import-data-button:hover {
+        background-color: #205067;
+    }
+    .readonly-field {
+        background-color: #f0f0f0;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin: 4px 0;
+    }
+    .pulled-data-section {
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        padding: 15px;
+        border-radius: 4px;
+        margin: 15px 0;
+        display: none;
+    }
+    .pulled-data-section.visible {
+        display: block;
+    }
+    .pulled-data-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 10px;
+    }
+    .pulled-data-item {
+        display: flex;
+        flex-direction: column;
+    }
+    .pulled-data-label {
+        font-weight: bold;
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 5px;
+    }
+    .batch-table-section {
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        padding: 15px;
+        border-radius: 4px;
+        margin: 20px 0;
+        display: none;
+        overflow-x: auto;
+    }
+    .batch-table-section.visible {
+        display: block;
+    }
+    .batch-table-section table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+    .batch-table-section th,
+    .batch-table-section td {
+        padding: 8px;
+        border: 1px solid #ddd;
+        text-align: left;
+    }
+    .batch-table-section th {
+        background-color: #417690;
+        color: white;
+        font-weight: bold;
+    }
+    .batch-table-section tr:nth-child(even) {
+        background-color: #f5f5f5;
+    }
+</style>
+{% endblock %}
+
+{% block form_top %}
+{{ block.super }}
+
+<!-- Import Instructions -->
+<div style="background: #e8f4f8; border-left: 4px solid #417690; padding: 12px; margin-bottom: 20px; border-radius: 4px;">
+    <strong>ℹ️ Import Instructions:</strong>
+    <ol style="margin: 8px 0 0 20px; padding: 0;">
+        <li>Select the <strong>site</strong> to import from</li>
+        <li>Enter the <strong>load number</strong> from that site</li>
+        <li>Click <strong>"Pull Transport Data"</strong> to preview the data</li>
+        <li>Enter a new <strong>HQ Load Number</strong> (must be unique)</li>
+        <li>Review and adjust as needed, then <strong>Save</strong></li>
+    </ol>
+</div>
+
+<!-- Pulled Data Preview Section -->
+<div id="pulledDataSection" class="pulled-data-section">
+    <h3 style="margin-top: 0; color: #417690;">Transport Load Data from Site</h3>
+    
+    <div class="pulled-data-row">
+        <div class="pulled-data-item">
+            <span class="pulled-data-label">Load Number</span>
+            <div class="readonly-field" id="pulled_load_number">-</div>
+        </div>
+        <div class="pulled-data-item">
+            <span class="pulled-data-label">Client</span>
+            <div class="readonly-field" id="pulled_client">-</div>
+        </div>
+        <div class="pulled-data-item">
+            <span class="pulled-data-label">Transporter</span>
+            <div class="readonly-field" id="pulled_transporter">-</div>
+        </div>
+        <div class="pulled-data-item">
+            <span class="pulled-data-label">Transport Cost</span>
+            <div class="readonly-field" id="pulled_transport_cost">-</div>
+        </div>
+    </div>
+
+    <div class="pulled-data-row">
+        <div class="pulled-data-item">
+            <span class="pulled-data-label">Billing Date</span>
+            <div class="readonly-field" id="pulled_billing_date">-</div>
+        </div>
+        <div class="pulled-data-item">
+            <span class="pulled-data-label">Released Date</span>
+            <div class="readonly-field" id="pulled_released_date">-</div>
+        </div>
+        <div class="pulled-data-item">
+            <span class="pulled-data-label">Date Loaded</span>
+            <div class="readonly-field" id="pulled_date_loaded">-</div>
+        </div>
+        <div class="pulled-data-item">
+            <span class="pulled-data-label">Total Quantity</span>
+            <div class="readonly-field" id="pulled_total_quantity">-</div>
+        </div>
+    </div>
+
+    <!-- Batch Details Table -->
+    <div id="batchTableSection" class="batch-table-section">
+        <h3 style="margin-top: 0; color: #417690;">Batch Details</h3>
+        <table id="batchDetailsTable">
+            <thead>
+                <tr>
+                    <th>Batch Number</th>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody id="batchDetailsBody">
+                <!-- Will be populated by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block after_field_sets %}
+{{ block.super }}
+
+<script>
+(function($) {
+    $(document).ready(function() {
+        // Add "Pull Transport Data" button after load_number field
+        var loadNumberField = $('#id_load_number').parent();
+        if (loadNumberField.length) {
+            var pullButton = $('<button type="button" class="import-data-button" id="pullTransportDataBtn">Pull Transport Data</button>');
+            loadNumberField.after(pullButton);
+            
+            pullButton.on('click', function() {
+                var site = $('#id_site').val();
+                var loadNumber = $('#id_load_number').val();
+                
+                if (!site) {
+                    alert('Please select a site first.');
+                    return;
+                }
+                if (!loadNumber) {
+                    alert('Please enter a load number.');
+                    return;
+                }
+                
+                // Call AJAX to pull transport data
+                pullTransportData(site, loadNumber);
+            });
+        }
+        
+        function pullTransportData(siteId, loadNumber) {
+            $.ajax({
+                url: '/hq/admin/transport/transportload/ajax/pull-transport-data/',
+                type: 'GET',
+                data: {
+                    site_id: siteId,
+                    load_number: loadNumber
+                },
+                success: function(data) {
+                    if (data.success) {
+                        // Show pulled data section
+                        $('#pulledDataSection').addClass('visible');
+                        
+                        // Populate basic fields
+                        $('#pulled_load_number').text(data.load_number || '-');
+                        $('#pulled_client').text(data.client || '-');
+                        $('#pulled_transporter').text(data.transporter || '-');
+                        $('#pulled_transport_cost').text(data.transport_cost ? 'R ' + data.transport_cost : '-');
+                        $('#pulled_billing_date').text(data.billing_date || '-');
+                        $('#pulled_released_date').text(data.released_date || '-');
+                        $('#pulled_date_loaded').text(data.date_loaded || '-');
+                        $('#pulled_total_quantity').text(data.total_quantity || '-');
+                        
+                        // Populate batch table if batch data exists
+                        if (data.batch_data && data.batch_data.length > 0) {
+                            $('#batchTableSection').addClass('visible');
+                            var tbody = $('#batchDetailsBody');
+                            tbody.empty();
+                            
+                            $.each(data.batch_data, function(index, batch) {
+                                var row = $('<tr>');
+                                row.append($('<td>').text(batch.batch_number || '-'));
+                                row.append($('<td>').text(batch.product || '-'));
+                                row.append($('<td>').text(batch.qty_for_invoice || '-'));
+                                row.append($('<td>').text(batch.unit_price ? 'R ' + batch.unit_price : '-'));
+                                row.append($('<td>').text(batch.total ? 'R ' + batch.total : '-'));
+                                tbody.append(row);
+                            });
+                        } else {
+                            $('#batchTableSection').removeClass('visible');
+                        }
+                        
+                        alert('✅ Transport data loaded successfully! Review the data below and click Save when ready.');
+                    } else {
+                        alert('❌ Error: ' + (data.error || 'Unknown error occurred'));
+                    }
+                },
+                error: function(xhr, status, error) {
+                    alert('❌ Failed to pull transport data: ' + error);
+                }
+            });
+        }
+    });
+})(django.jQuery || jQuery);
+</script>
+{% endblock %}

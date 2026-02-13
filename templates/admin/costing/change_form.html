@@ -1,0 +1,10 @@
+{% extends "admin/change_form.html" %}
+
+{% block content %}
+<!-- Data attribute for JavaScript to access current site ID -->
+<div data-current-site-id="{{ current_site_id }}" style="display:none;"></div>
+
+<div class="django-cte-admin">
+    {{ block.super }}
+</div>
+{% endblock %}

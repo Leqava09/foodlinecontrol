@@ -1,0 +1,33 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls static %}
+
+{% block form %}
+    {{ block.super }}
+    
+    {# Store back_url and next as hidden fields so they persist through form submission #}
+    {% if back_url %}
+        <input type="hidden" name="back_url" value="{{ back_url }}" />
+        <input type="hidden" name="next" value="{{ back_url }}" />
+    {% endif %}
+{% endblock %}
+
+{% block submit_buttons %}
+    <div class="submit-row">
+        {% if back_url %}
+            <a href="{{ back_url }}" class="button">← Back to Transaction</a>
+        {% endif %}
+        {{ block.super }}
+    </div>
+{% endblock %}
+
+{% block submit_buttons_bottom %}
+    <div class="submit-row">
+        {% if back_url %}
+            <a href="{{ back_url }}" class="button">← Back to Transaction</a>
+        {% else %}
+            <a href="{% url 'admin:inventory_stocktransaction_changelist' %}" class="button">← Back to Stock Transactions</a>
+        {% endif %}
+        {{ block.super }}
+    </div>
+{% endblock %}
+

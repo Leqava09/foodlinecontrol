@@ -1,0 +1,96 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <script>
+    window.Actions = function () {};
+    
+    // Attach IMMEDIATELY, not waiting for DOMContentLoaded
+    (function() {
+      function attachSearchFix() {
+        const searchInput = document.getElementById('grp-changelist-search');
+        const searchButton = document.querySelector('.grp-search-button');
+        
+        if (!searchInput || !searchButton) {
+          setTimeout(attachSearchFix, 50);
+          return;
+        }
+        
+        console.log('🔍 Attaching search fix NOW');
+        
+        function doSearch(e) {
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+          }
+          
+          const searchTerm = searchInput.value.trim();
+          console.log('🔎 SEARCH:', searchTerm);
+          
+          window.location.href = searchTerm ? '?q=' + encodeURIComponent(searchTerm) : '?';
+          return false;
+        }
+        
+        // Remove default button behavior
+        searchButton.type = 'button';
+        
+        searchInput.onkeydown = function(e) {
+          if (e.key === 'Enter') {
+            console.log('⚡ ENTER KEY');
+            return doSearch(e);
+          }
+        };
+        
+        searchButton.onclick = function(e) {
+          console.log('🖱️ BUTTON CLICK');
+          return doSearch(e);
+        };
+        
+        console.log('✅ Search fixed');
+      }
+      
+      attachSearchFix();
+    })();
+  </script>
+  <style>
+    #grp-filters {
+      display: none !important;
+    }
+  </style>
+{% endblock %}
+
+
+
+{% block search %}
+  <div style="display:flex; align-items:center; gap:10px;">
+
+    {# Archived / Active pill #}
+    {% if request.GET.is_archived == "1" %}
+      <a href="?" class="grp-button grp-state-default grp-state-active"
+         style="border-radius:15px; padding:4px 14px; text-decoration:none; min-width:85px; text-align:center;">
+        Active
+      </a>
+    {% else %}
+      <a href="?is_archived=1" class="grp-button grp-state-default"
+         style="border-radius:15px; padding:4px 14px; text-decoration:none; min-width:85px; text-align:center;">
+        Archived
+      </a>
+    {% endif %}
+
+    {# Date filter dropdown #}
+    <select onchange="if(this.value) window.location.href=this.value;" style="padding:4px 8px;">
+      <option value="">Date Created</option>
+      <option value="?">All</option>
+      <option value="?date_created__gte=2026-01-19&date_created__lt=2026-01-20">Today</option>
+      <option value="?date_created__gte=2026-01-12&date_created__lt=2026-01-20">Past 7 days</option>
+      <option value="?date_created__gte=2026-01-01&date_created__lt=2026-02-01">This month</option>
+    </select>
+
+    {# Search box #}
+    <div style="flex:1;">
+      {{ block.super }}
+    </div>
+  </div>
+{% endblock %}

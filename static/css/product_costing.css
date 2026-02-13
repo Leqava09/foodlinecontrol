@@ -1,0 +1,78 @@
+/* Center the price per unit display vertically - Grappelli */
+
+/* Overhead and Salary Costing rows */
+.form-row:has(.overhead_price_per_unit_display),
+.form-row:has(.salary_price_per_unit_display) {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+}
+
+/* Hide the inline section */
+.inline-group {
+    display: none !important;
+}
+
+/* Summary table - NO min-width, let it fit naturally */
+#summary-items-container {
+    width: 100%;
+    overflow-x: auto;
+    margin: 10px 0;
+}
+
+#summary-items-container table {
+    width: 100%;
+}
+
+/* Remove grp-readonly padding for summary items */
+.grp-readonly:has(#summary-items-container) {
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+}
+
+/* Remove grp-readonly padding for batch approvals */
+.grp-readonly:has(table) {
+    padding: 0 !important;
+    border: none !important;
+    background: none !important;
+}
+
+/* Remove any fieldset borders around batch approvals display */
+.field-batch_approvals_display .grp-readonly {
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+}
+
+/* Hide empty label column for batch approvals */
+.form-row:has(.batch-price-input) .c-1,
+.grp-row:has(.batch-price-input) .c-1 {
+    display: none !important;
+}
+
+/* Make content column full width */
+.form-row:has(.batch-price-input) .c-2,
+.grp-row:has(.batch-price-input) .c-2 {
+    width: 100% !important;
+}
+/* Center the Production Date cell in list view */
+#changelist table.grp-table tbody th.field-production_date_display {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+/* Center production_date_display column - WITH UNDERSCORES */
+#result_list th.column-production_date_display {
+    text-align: center !important;
+}
+
+#result_list th.field-production_date_display {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
+#result_list th.field-production_date_display a {
+    display: block;
+    text-align: center;
+}

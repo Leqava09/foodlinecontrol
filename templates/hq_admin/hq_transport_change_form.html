@@ -1,0 +1,35 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    /* General form styling */
+    .form-row {
+        margin-bottom: 15px;
+    }
+    
+    /* Document fields styling */
+    .field-delivery_note_documents,
+    .field-namra_documents,
+    .field-daff_documents,
+    .field-meat_board_documents,
+    .field-import_permit_documents,
+    .field-other_documents {
+        margin-top: 10px;
+    }
+    
+    /* Help text styling */
+    .help {
+        font-size: 12px;
+        color: #666;
+        display: block;
+        margin-top: 5px;
+    }
+    
+    /* Make select fields more visible */
+    select {
+        min-width: 200px;
+    }
+</style>
+{% endblock %}

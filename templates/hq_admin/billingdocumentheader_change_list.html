@@ -1,0 +1,23 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls static %}
+
+{% block search %}
+{{ block.super }}
+{% endblock %}
+
+{% block content_title %}
+{{ block.super }}
+{% endblock %}
+
+{% block object-tools %}
+<div style="display: flex; gap: 8px; margin-top: 10px;">
+    {% if has_add_permission %}
+        <a href="{% url opts|admin_urlname:'add' %}" class="button" style="padding: 8px 12px; font-size: 13px;">
+            + Add {{ opts.verbose_name }}
+        </a>
+        <a href="/hq/admin/costing/billingdocumentheader/import/add/" class="button" style="padding: 8px 12px; font-size: 13px;">
+            ⬇ Import {{ opts.verbose_name }}
+        </a>
+    {% endif %}
+</div>
+{% endblock %}

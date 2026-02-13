@@ -1,0 +1,824 @@
+/* Inventory Changelist Styling */
+
+/* ===== REMOVE ALL RIGHT-SIDE MARGINS/PADDING ===== */
+#grp-content {
+    margin-top: 50px !important;
+    margin-bottom: 10px !important;
+    margin-left: 10px !important;
+    margin-right: 0px !important;     /* ← ZERO OUT */
+    padding: 0px !important;
+    background: white !important;
+}
+
+#grp-content-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    margin-right: 0 !important;       /* ← EXPLICIT ZERO */
+}
+
+.results {
+    margin: 0 !important;
+    margin-right: 0 !important;       /* ← EXPLICIT ZERO */
+    padding: 0 !important;
+    padding-right: 0 !important;      /* ← EXPLICIT ZERO */
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    background: white !important;
+}
+
+.results-content {
+    margin: 0 !important;
+    margin-right: 0 !important;       /* ← EXPLICIT ZERO */
+    padding: 0 !important;
+    padding-right: 0 !important;      /* ← EXPLICIT ZERO */
+    overflow-x: auto !important;
+    width: 100%;
+    display: block !important;
+}
+
+/* Remove padding from all table cells */
+table th, table td {
+    padding-right: 6px !important;    /* ← REDUCE right padding */
+    white-space: nowrap !important;
+}
+/* ===== CLOSE THE TWO GREEN GAPS ===== */
+.inventory-actions {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 20px;
+    margin-top: 20px;
+    padding: 15px 0 10px 0;
+    flex-wrap: wrap;
+    justify-content: flex-start !important;  /* was space-between */
+    align-items: center;
+    margin-left: 30px;
+}
+
+.inventory-actions .btn-archive,
+.inventory-actions .btn-archive-active {
+    margin-left: 40px;   /* pull it closer to the left group */
+}
+
+.batch-tracker-container {
+    margin-top: 5px !important;      /* ← Close gap before batch tracker */
+}
+
+.batch-section {
+    margin-bottom: 15px !important;  /* ← Reduce space between batches */
+}
+
+/* ===== HIDE ELEMENTS NOT NEEDED ===== */
+body.change-list #changelist-aside,
+body.change-list .right-sidebar,
+body.change-list #changelist-filter,
+body.change-list #result_list,
+body.change-list .search,
+body.change-list .filters,
+body.change-list #toolbar,
+body.change-list fieldset,
+body.change-list .submit-row,
+body.change-list .pagination,
+body.change-list .filtered,
+body.change-list .result_count,
+body.change-list ul.action-links,
+body.change-list p.paginator,
+body.change-list input[type="text"][hidden],
+body.change-list hr,
+body.change-list .printlink,
+body.change-list .viewsitelink,
+body.change-list .addlink,
+body.change-list .inventory-filter-container {
+    display: none !important;
+}
+
+/* ===== LAYOUT FIXES ===== */
+#changelist,
+#changelist-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    margin-left: 0 !important;
+    background: white !important;
+}
+
+#content > * {
+    display: block !important;
+}
+
+#changelist .results + * {
+    display: none !important;
+}
+
+body.change-list {
+    margin-right: 0 !important;
+}
+
+/* ===== COLOR VARIABLES ===== */
+:root {
+    --primary-color: #417690;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --warning-color: #ff6f00;
+    --info-color: #0056b3;
+    --border-color: #ddd;
+    --header-bg: #4a8fa5;
+    --row-bg: #fafafa;
+}
+
+
+/* ===== ACTION BUTTONS ===== */
+.inventory-actions {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 20px;
+    margin-top: 20px;               /* Changed from 20px to 5px - move up */
+    padding: 15px 0 10px 0;        /* Adjust padding to move buttons up */
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: center;
+	margin-left: 30px; 
+}
+
+.btn-action {
+    padding: 12px 28px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 14px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    min-width: fit-content;
+    height: 40px;                  /* Reduced from 44px */
+    line-height: 1;
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+}
+
+.btn-booking-in {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.btn-booking-in:hover {
+    background-color: #218838;
+}
+
+/* ===== MODAL STYLES ===== */
+.modal-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 9999 !important;
+}
+
+.modal-dialog {
+    background: white !important;
+    border-radius: 12px !important;
+    padding: 40px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+    text-align: center !important;
+    max-width: 450px !important;
+    width: 90% !important;
+}
+
+.modal-dialog h2 {
+    margin: 0 0 20px 0 !important;
+    color: #333 !important;
+    font-size: 22px !important;
+    font-weight: 700 !important;
+}
+
+.modal-dialog p {
+    margin: 0 0 30px 0 !important;
+    color: #666 !important;
+    font-size: 16px !important;
+}
+
+.modal-dialog button {
+    padding: 16px 24px !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    min-width: 200px !important;
+}
+
+/* ===== TABS SECTION ===== */
+.inventory-tabs-container {
+    margin: 15px 0 20px 0 !important;
+    padding: 0 !important;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.category-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 0;
+}
+
+.category-tab {
+    padding: 10px 15px;
+    background-color: #e9ecef;
+    border: 2px solid transparent;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-weight: 600;
+    color: #333;
+    border-radius: 4px 4px 0 0;
+    transition: all 0.3s ease;
+    font-size: 14px;
+}
+
+.category-tab:hover {
+    background-color: #dee2e6;
+    color: var(--primary-color);
+}
+
+.category-tab.active {
+    background-color: white;
+    border-color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.category-tabs.sub-tabs {
+    display: flex !important;
+    flex-direction: row;
+    margin-top: 10px;
+    padding-left: 0;
+    border-left: none;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.category-tab.sub-tab {
+    font-size: 13px;
+    padding: 8px 12px;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.category-tab.sub-tab.active {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.category-tab.sub-tab:hover {
+    background-color: #e9ecef;
+}
+
+/* ===== BATCH TRACKER SECTION ===== */
+.batch-tracker-container {
+    width: 100%;
+}
+
+.batch-section {
+    background-color: white;
+    border: 3px solid #333;
+    margin-bottom: 30px;
+    border-radius: 4px;
+    overflow: hidden !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    width: 100%;
+}
+
+/* ===== BATCH ACTIONS (Per batch) ===== */
+.batch-actions {
+    display: flex;
+    gap: 30px;                      /* ← CHANGED from 30px to 10px */
+    padding: 12px 20px;
+    background-color: #f9f9f9;
+    border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+    margin-left: 20px;
+}
+
+.btn-batch-action {
+    padding: 15px 60px;           /* ← CHANGED from 10px to 15px */
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 20px;             /* ← CHANGED from 40px to 50px */
+	white-space: nowrap; 
+}
+
+.btn-book-out {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.btn-book-out:hover {
+    background-color: #c82333;
+}
+
+.btn-batch-amendment {
+    background-color: var(--info-color);
+    color: white;
+}
+
+.btn-batch-amendment:hover {
+    background-color: #004085;
+}
+
+
+/* ===== TABLE STYLING ===== */
+.batch-tracker-table {
+    width: 99% !important;
+    border-collapse: collapse;
+    font-size: 13px;
+    background-color: white;
+    table-layout: auto !important;
+    display: table !important;
+}
+
+.batch-tracker-table thead {
+    background-color: var(--header-bg);
+    color: white;
+    display: table-header-group !important;
+}
+
+.batch-tracker-table thead th {
+    padding: 12px 10px;
+    text-align: center;
+    font-weight: bold;
+    border-right: 1px solid #fff;
+    border-bottom: 2px solid #333;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.batch-tracker-table thead th:last-child {
+    border-right: none;
+}
+
+.batch-tracker-table tbody {
+    display: table-row-group !important;
+}
+
+.batch-tracker-table tbody tr {
+    display: table-row !important;
+}
+
+.batch-tracker-table tbody td {
+    padding: 8px 10px;
+    border-right: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 13px;
+    vertical-align: middle;
+    text-align: center;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    display: table-cell !important;
+}
+
+.batch-tracker-table tbody td:last-child {
+    border-right: none;
+}
+
+.batch-tracker-table tbody tr:nth-child(odd) {
+    background-color: white;
+}
+
+.batch-tracker-table tbody tr:nth-child(even) {
+    background-color: var(--row-bg);
+}
+
+.batch-tracker-table tbody tr:hover {
+    background-color: #f0f8ff;
+}
+
+/* Cell-specific styles */
+.cell-supplier, .cell-batch, .cell-item {
+    font-weight: 500;
+    background-color: var(--row-bg);
+    text-align: left;
+    padding-left: 12px;
+}
+
+.cell-qty {
+    font-weight: bold;
+    text-align: right;
+}
+
+.qty-positive {
+    color: var(--success-color);
+    font-weight: bold;
+}
+
+.qty-negative {
+    color: var(--danger-color);
+    font-weight: bold;
+}
+
+.activity-booking-in {
+    background-color: #d4edda;
+    color: #155724;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.activity-booking-out {
+    background-color: #f8d7da;
+    color: #721c24;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.activity-amendment {
+    background-color: #cfe2ff;
+    color: #084298;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-weight: 600;
+    display: inline-block;
+}
+
+/* ===== SUMMARY ROW ===== */
+.batch-summary {
+    display: flex;
+    gap: 15px;
+    background-color: #e8f4f8;
+    padding: 12px;
+    border-top: 2px solid #333;
+    font-weight: 600;
+    font-size: 13px;
+    flex-wrap: wrap;
+}
+
+.summary-item {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex: 1;
+    min-width: 180px;
+    padding: 8px;
+    background-color: var(--header-bg);
+    color: white;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.summary-label {
+    flex: 1;
+    text-align: left;
+}
+
+.summary-value {
+    min-width: 80px;
+    text-align: right;
+    font-weight: bold;
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 1400px) {
+    .batch-tracker-table {
+        font-size: 12px;
+    }
+    
+    .batch-tracker-table thead th,
+    .batch-tracker-table tbody td {
+        padding: 6px 4px;
+    }
+}
+
+@media (max-width: 768px) {
+    .category-tabs {
+        gap: 3px;
+    }
+    
+    .category-tab {
+        padding: 8px 10px;
+        font-size: 12px;
+    }
+    
+    .batch-tracker-table {
+        font-size: 11px;
+    }
+    
+    .batch-tracker-table thead th,
+    .batch-tracker-table tbody td {
+        padding: 4px 2px;
+    }
+    
+    .batch-actions {
+        flex-direction: column;
+    }
+    
+    .btn-batch-action {
+        width: 100%;
+    }
+    
+    .batch-summary {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .summary-item {
+        min-width: auto;
+        justify-content: space-between;
+    }
+}
+
+/* ===== UTILITY CLASSES ===== */
+.text-center {
+    text-align: center;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-left {
+    text-align: left;
+}
+
+.mt-15 {
+    margin-top: 15px;
+}
+
+.mb-15 {
+    margin-bottom: 15px;
+}
+
+.hidden {
+    display: none;
+}
+
+.visible {
+    display: block;
+}
+/* Production Out Activity - Orange with background */
+.activity-production-out {
+    color: #D97706;  /* Orange text */
+    font-weight: bold;
+    background-color: #FED7AA;  /* Light orange background */
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+/* Production Out Quantity - Orange */
+.qty-production-out {
+    color: #E67E22 !important;  /* Orange */
+    font-weight: bold;
+}
+
+/* Variance / Difference - Purple */
+.qty-variance-positive {
+    color: #7C3AED; /* Purple 600 */
+    font-weight: bold;
+    background-color: #EDE9FE; /* Purple 100 */
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.qty-variance-negative {
+    color: #DC2626; /* Red 600 */
+    font-weight: bold;
+    background-color: #FEE2E2; /* Red 100 */
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+/* Summary pill base */
+.summary-pill {
+    display: inline-block;
+    min-width: 80px;
+    text-align: right;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+/* Booking in – green */
+.summary-pill-in {
+    color: #166534;
+    background-color: #DCFCE7;
+}
+
+/* Balance – teal */
+.summary-pill-balance {
+    color: #0F766E;
+    background-color: #CCFBF1;
+}
+
+/* Booking out – red */
+.summary-pill-out {
+    color: #B91C1C;
+    background-color: #FEE2E2;
+}
+
+/* Production – orange */
+.summary-pill-production {
+    color: #92400E;
+    background-color: #FFEDD5;
+}
+
+/* Difference – purple (positive) */
+.summary-pill-diff-positive {
+    color: #5B21B6;
+    background-color: #EDE9FE;
+}
+
+/* Difference – red (negative) */
+.summary-pill-diff-negative {
+    color: #B91C1C;
+    background-color: #FEE2E2;
+}
+/* Archive button specific styling */
+.btn-archive,
+.btn-archive-active {
+    background-color: #6c757d;
+    color: white;
+    padding: 10px 20px !important;     /* Control size here */
+    font-size: 14px !important;
+    min-width: 90px !important;
+    height: auto !important;          /* Override .btn-action height */
+    border-radius: 15px;
+}
+
+.btn-archive-active {
+    background-color: #28a745;        /* Green when in archived view */
+}
+
+.btn-archive:hover {
+    background-color: #5a6268;
+}
+
+.btn-archive-active:hover {
+    background-color: #218838;
+}
+/* ===== LAYOUT & WIDTH FIX TEST BLOCK ===== */
+
+/* Allow page width to be used fully; no horizontal scroll */
+html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-x: visible !important;
+}
+
+/* Main content flush with left edge */
+#grp-content,
+#grp-content-container,
+#changelist,
+#changelist-content {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+}
+
+/* Top booking buttons row */
+.inventory-actions {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    margin-left: 0 !important;        /* no extra offset */
+    padding-left: 10px !important;    /* small breathing space */
+    justify-content: flex-start !important;
+}
+
+/* Buttons themselves a bit narrower */
+.btn-action {
+    padding: 6px 14px !important;
+}
+
+/* Results wrappers */
+.results,
+.results-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-x: auto !important;
+}
+
+/* Batch tracker container */
+.batch-tracker-container,
+.batch-section {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-x: auto !important;
+}
+
+/* Table sizing and wrapping */
+.batch-tracker-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+}
+
+.batch-tracker-table th,
+.batch-tracker-table td {
+    padding: 6px 4px !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+/* Summary row */
+.batch-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-x: auto !important;
+}
+
+/* Batch actions row */
+.batch-actions {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-x: auto !important;
+}
+/* Fine‑tune booking buttons spacing from left edge */
+.inventory-actions {
+    padding-left: 30px !important;   /* tweak this: 10–20px */
+    margin-left: 0 !important;       /* keep margin at 0 so nothing clips */
+}
+/* Position 'Archived' button to the right end of the row */
+.inventory-actions {
+    padding-left: 30px !important;  /* your working value */
+    margin-left: 0 !important;
+    display: flex !important;
+    align-items: center;
+}
+
+/* Push the archive button group to the far right */
+.inventory-actions .btn-archive,
+.inventory-actions .btn-archive-active {
+    margin-left: auto !important;   /* takes remaining space */
+    margin-right: 30px !important;  /* adjust to match the right gap you want */
+}
+/* Remove horizontal scrollbar at bottom and force table to fit */
+
+#container,
+#grp-content,
+#grp-content-container,
+#changelist,
+#changelist-content,
+.results,
+.results-content,
+.batch-tracker-container,
+.batch-section {
+    overflow-x: hidden !important;     /* no horizontal scrollbars */
+}
+
+/* Table must not exceed its container */
+.batch-tracker-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+}
+
+/* Allow wrapping so content shrinks instead of pushing width */
+.batch-tracker-table th,
+.batch-tracker-table td {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+}
+/* Show all paginations normally */
+nav.grp-pagination {
+    display: block !important;
+}
+
+/* Hide ONLY the first pagination inside the changelist form (top 31 total) */
+#grp-changelist-form > .grp-module:first-of-type nav.grp-pagination {
+    display: none !important;
+}
+/* Hide the whole empty module that used to hold top pagination */
+#grp-changelist-form > .grp-module:first-of-type {
+    display: none !important;
+}
+/* Move booking buttons closer to "Stock transactions" heading */
+.inventory-actions {
+    margin-top: 0px !important;     /* was around 20px */
+    padding-top: 0px !important;    /* keep small breathing space */
+}

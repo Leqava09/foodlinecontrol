@@ -1,0 +1,362 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block title %}Stock Usage Report{% endblock %}
+
+{% block breadcrumbs %}
+<ul class="grp-breadcrumb">
+    <li><a href="{% url 'admin:index' %}">Home</a></li>
+    <li><a href="{% url 'admin:app_list' 'manufacturing' %}">Manufacturing</a></li>
+    <li>Stock Usage Report</li>
+</ul>
+{% endblock %}
+
+{% block content_title %}{% endblock %}
+
+{% block content %}
+<style>
+    .report-container { padding: 5px 15px; }
+    .report-section { background: #fff; border-radius: 6px; padding: 10px 15px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .report-section h2 { margin-top: 0; margin-bottom: 8px; color: #417690; border-bottom: 2px solid #417690; padding-bottom: 6px; font-size: 15px; }
+    
+    /* Summary Cards */
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 8px; }
+    .summary-card { background: #f8f9fa; padding: 10px; border-radius: 5px; text-align: center; border-left: 4px solid #417690; }
+    .summary-card.success { border-left-color: #28a745; }
+    .summary-card.warning { border-left-color: #ffc107; }
+    .summary-card.danger { border-left-color: #dc3545; }
+    .summary-card.info { border-left-color: #17a2b8; }
+    .summary-card .label { font-weight: bold; color: #333; font-size: 11px; text-transform: uppercase; }
+    .summary-card .value { font-size: 18px; font-weight: bold; color: #417690; margin: 4px 0; }
+    .summary-card .unit { font-size: 10px; color: #666; }
+    
+    /* Filter Bar */
+    .filter-bar { background: #f5f5f5; padding: 10px 12px; border-radius: 5px; margin-bottom: 0; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .filter-bar label { font-weight: bold; margin-right: 4px; font-size: 12px; }
+    .filter-bar select, .filter-bar input { padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; }
+    .filter-bar .btn-group { display: flex; gap: 8px; margin-left: auto; }
+    .filter-bar button { background: #417690; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; min-width: 60px; font-size: 12px; }
+    .filter-bar button:hover { background: #205067; }
+    .filter-bar .clear-btn { background: #6c757d; text-decoration: none; color: white; padding: 6px 16px; border-radius: 4px; display: inline-block; min-width: 60px; text-align: center; font-size: 12px; }
+    .filter-bar .clear-btn:hover { background: #5a6268; }
+    
+    /* Tables */
+    .usage-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; table-layout: auto; }
+    .usage-table th, .usage-table td { padding: 3px 4px; text-align: left; border-bottom: 1px solid #ddd; white-space: nowrap; }
+    .usage-table th { background: #f8f9fa; font-weight: bold; color: #333; position: sticky; top: 0; font-size: 10px; }
+    .usage-table tr:hover { background: #f5f5f5; }
+    .usage-table .qty { text-align: right; }
+    .usage-table .total-row { background: #e9ecef; font-weight: bold; }
+    .usage-table .total-row td { border-top: 2px solid #417690; }
+    
+    /* Loss Indicators */
+    .loss-good { color: #28a745; font-weight: bold; }
+    .loss-warning { color: #fd7e14; font-weight: bold; }
+    .loss-bad { color: #dc3545; font-weight: bold; }
+    
+    /* Category Badge */
+    .category-badge { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; background: #e2e3e5; color: #383d41; text-transform: capitalize; }
+    .category-badge.local { background: #d1ecf1; color: #0c5460; }
+    .category-badge.meat { background: #f8d7da; color: #721c24; }
+    .category-badge.beans { background: #fff3cd; color: #856404; }
+    
+    /* Tabs - Custom styling */
+    .report-tabs { display: flex; gap: 0; margin: -8px 0 0 0; border-bottom: 3px solid #417690; }
+    .report-tabs .report-tab-btn { 
+        padding: 8px 24px; 
+        background: #e9ecef; 
+        border: 1px solid #ccc;
+        border-bottom: none;
+        cursor: pointer; 
+        font-size: 12px; 
+        font-weight: bold; 
+        color: #555; 
+        border-radius: 5px 5px 0 0; 
+        margin-right: 3px;
+        margin-bottom: -3px;
+        position: relative;
+        z-index: 1;
+    }
+    .report-tabs .report-tab-btn.active { 
+        background: #417690; 
+        color: #fff; 
+        border-color: #417690;
+    }
+    .report-tabs .report-tab-btn:hover:not(.active) { 
+        background: #d0d0d0; 
+    }
+    .report-tab-content { 
+        display: none; 
+        padding-top: 8px; 
+    }
+    .report-tab-content.active { 
+        display: block !important; 
+    }
+    
+    .no-data { color: #999; font-style: italic; padding: 20px; text-align: center; }
+    .container-link { color: #417690; text-decoration: none; cursor: pointer; font-weight: bold; }
+    .container-link:hover { text-decoration: underline; }
+    
+    /* Expandable rows */
+    .container-row { cursor: pointer; }
+    .container-row:hover { background: #e8f4f8 !important; }
+    .container-row td:first-child::before { content: "▶ "; color: #417690; font-size: 10px; }
+    .container-row.expanded td:first-child::before { content: "▼ "; }
+    .batch-details { display: none; }
+    .batch-details.show { display: table-row; }
+    .batch-details td { padding: 0 !important; background: #f8f9fa; }
+    .batch-detail-table { width: 100%; margin: 0; font-size: 10px; border: none; }
+    .batch-detail-table th { background: #e9ecef !important; font-size: 10px; padding: 4px 6px !important; }
+    .batch-detail-table td { padding: 4px 6px !important; border-bottom: 1px solid #e0e0e0 !important; }
+    .batch-detail-table tr:last-child td { border-bottom: none !important; }
+    .detail-wrapper { padding: 8px 8px 8px 25px; }
+    .detail-header { font-weight: bold; color: #417690; margin-bottom: 5px; font-size: 11px; }
+</style>
+
+<div class="report-container">
+    <!-- Filters -->
+    <div class="report-section">
+        <form method="get" class="filter-bar">
+            <div>
+                <label for="category">Category:</label>
+                <select name="category" id="category">
+                    <option value="">All Categories</option>
+                    {% for cat in category_choices %}
+                    <option value="{{ cat }}" {% if current_category == cat %}selected{% endif %}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="container">Container:</label>
+                <input type="text" name="container" id="container" value="{{ current_container }}" placeholder="Search...">
+            </div>
+            <div>
+                <label for="date_from">Date From:</label>
+                <input type="date" name="date_from" id="date_from" value="{{ date_from }}">
+            </div>
+            <div>
+                <label for="date_to">To:</label>
+                <input type="date" name="date_to" id="date_to" value="{{ date_to }}">
+            </div>
+            <div class="btn-group">
+                <button type="submit">Filter</button>
+                <a href="?" class="clear-btn">Clear</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Grand Totals Summary -->
+    <div class="report-section">
+        <h2>📊 Stock Usage Summary</h2>
+        <div class="summary-grid">
+            <div class="summary-card info">
+                <div class="label">Total Book In</div>
+                <div class="value">{{ grand_totals.total_book_in|floatformat:0 }}</div>
+                <div class="unit">kg</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">Total Book Out</div>
+                <div class="value">{{ grand_totals.total_book_out|floatformat:0 }}</div>
+                <div class="unit">kg</div>
+            </div>
+            <div class="summary-card success">
+                <div class="label">Total Used</div>
+                <div class="value">{{ grand_totals.total_used|floatformat:0 }}</div>
+                <div class="unit">kg</div>
+            </div>
+            <div class="summary-card warning">
+                <div class="label">Remaining</div>
+                <div class="value">{{ grand_totals.total_remaining|floatformat:0 }}</div>
+                <div class="unit">kg</div>
+            </div>
+            <div class="summary-card {% if grand_totals.overall_loss_filling > 40 %}danger{% elif grand_totals.overall_loss_filling > 30 %}warning{% else %}success{% endif %}">
+                <div class="label">Avg Loss (Filling)</div>
+                <div class="value">{{ grand_totals.overall_loss_filling|floatformat:1 }}%</div>
+            </div>
+            <div class="summary-card {% if grand_totals.overall_loss_pouch > 60 %}danger{% elif grand_totals.overall_loss_pouch > 50 %}warning{% else %}success{% endif %}">
+                <div class="label">Avg Loss (Pouch)</div>
+                <div class="value">{{ grand_totals.overall_loss_pouch|floatformat:1 }}%</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="report-section" style="padding-top: 0;">
+        <div style="display: flex; gap: 0; margin: 0; padding: 0; border-bottom: 3px solid #417690;">
+            <a href="#" id="btn-container" onclick="showTab('container'); return false;" 
+               style="display: inline-block; padding: 10px 24px; background: #417690; color: #fff; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px 5px 0 0; margin-right: 4px; margin-bottom: -3px; border: 1px solid #417690; border-bottom: none;">
+                📦 By Container ({{ container_summary|length }})
+            </a>
+            <a href="#" id="btn-daily" onclick="showTab('daily'); return false;" 
+               style="display: inline-block; padding: 10px 24px; background: #e9ecef; color: #555; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px 5px 0 0; margin-right: 4px; margin-bottom: -3px; border: 1px solid #ccc; border-bottom: none;">
+                📅 Daily Usage ({{ daily_data|length }})
+            </a>
+        </div>
+        
+        <!-- Container Summary Tab - Default view (shows one row per container, click to expand) -->
+        <div id="tab-container" class="report-tab-content active">
+            {% if container_summary %}
+            <table class="usage-table" id="container-table">
+                <thead>
+                    <tr>
+                        <th>Container</th>
+                        <th>Category</th>
+                        <th>Stock Item</th>
+                        <th class="qty">Book In</th>
+                        <th class="qty">Book Out</th>
+                        <th class="qty">Remaining</th>
+                        <th class="qty">Used</th>
+                        <th class="qty">% Loss Filling</th>
+                        <th class="qty">% Loss Pouch</th>
+                        <th class="qty">Price/kg</th>
+                        <th class="qty">Uses</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in container_summary %}
+                    <tr class="container-row" onclick="toggleDetails('details-{{ forloop.counter }}', this)">
+                        <td>{{ row.container_number }}</td>
+                        <td><span class="category-badge {% if 'local' in row.category|lower %}local{% elif 'meat' in row.category|lower %}meat{% elif 'bean' in row.category|lower %}beans{% endif %}">{{ row.display_category|default:"Local" }}</span></td>
+                        <td>{{ row.stock_item|default:"-" }}</td>
+                        <td class="qty">{{ row.book_in_qty|floatformat:0 }}</td>
+                        <td class="qty">{{ row.total_book_out|floatformat:0 }}</td>
+                        <td class="qty">{{ row.remaining_stock|floatformat:0 }}</td>
+                        <td class="qty">{{ row.total_used_defrosted|floatformat:0 }}</td>
+                        <td class="qty {% if row.avg_loss_filling > 40 %}loss-bad{% elif row.avg_loss_filling > 30 %}loss-warning{% else %}loss-good{% endif %}">{{ row.avg_loss_filling|floatformat:1 }}%</td>
+                        <td class="qty {% if row.avg_loss_pouch > 60 %}loss-bad{% elif row.avg_loss_pouch > 50 %}loss-warning{% else %}loss-good{% endif %}">{{ row.avg_loss_pouch|floatformat:1 }}%</td>
+                        <td class="qty">{{ row.price_per_kg|floatformat:2 }}</td>
+                        <td class="qty">{{ row.usage_count }}</td>
+                    </tr>
+                    <tr id="details-{{ forloop.counter }}" class="batch-details">
+                        <td colspan="11">
+                            <div class="detail-wrapper">
+                                <div class="detail-header">📋 Production Usage for {{ row.container_number }} (Price/kg: {{ row.price_per_kg|floatformat:2 }})</div>
+                                <table class="batch-detail-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Production Batches</th>
+                                            <th class="qty">Balance Prev</th>
+                                            <th class="qty">Book Out</th>
+                                            <th class="qty">Stock Left</th>
+                                            <th class="qty">Used</th>
+                                            <th class="qty">Used Costing</th>
+                                            <th class="qty">% Loss Filling</th>
+                                            <th class="qty">% Loss Pouch</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for batch in row.batch_details %}
+                                        <tr>
+                                            <td>{{ batch.production_date|date:"d-m-Y" }}</td>
+                                            <td style="font-size: 9px; max-width: 200px;">
+                                                {% for pb in batch.production_batches %}
+                                                <div style="margin-bottom: 2px;"><strong>{{ pb.batch_number }}</strong> - {{ pb.product }} ({{ pb.size }})</div>
+                                                {% empty %}
+                                                -
+                                                {% endfor %}
+                                            </td>
+                                            <td class="qty">{{ batch.balance_prev|floatformat:0 }}</td>
+                                            <td class="qty">{{ batch.book_out_qty|floatformat:0 }}</td>
+                                            <td class="qty">{{ batch.stock_left|floatformat:0 }}</td>
+                                            <td class="qty">{{ batch.used_defrosted|floatformat:2 }}</td>
+                                            <td class="qty" style="font-weight: bold; color: #28a745;">{{ currency }} {{ batch.used_costing|floatformat:2 }}</td>
+                                            <td class="qty {% if batch.loss_filling > 40 %}loss-bad{% elif batch.loss_filling > 30 %}loss-warning{% else %}loss-good{% endif %}">{{ batch.loss_filling|floatformat:1 }}%</td>
+                                            <td class="qty {% if batch.loss_pouch > 60 %}loss-bad{% elif batch.loss_pouch > 50 %}loss-warning{% else %}loss-good{% endif %}">{{ batch.loss_pouch|floatformat:1 }}%</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="no-data">No container data found matching the filters</div>
+            {% endif %}
+        </div>
+        
+        <!-- Daily Usage Tab (shows each day's usage separately) -->
+        <div id="tab-daily" class="report-tab-content">
+            {% if daily_data %}
+            <table class="usage-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Container/Batch</th>
+                        <th>Category</th>
+                        <th>Stock Item</th>
+                        <th>Production Batches</th>
+                        <th class="qty">Balance Prev</th>
+                        <th class="qty">Book Out</th>
+                        <th class="qty">Stock Left</th>
+                        <th class="qty">Used Defrost</th>
+                        <th class="qty">% Loss Filling</th>
+                        <th class="qty">% Loss Pouch</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in daily_data %}
+                    <tr>
+                        <td>{{ row.production_date|date:"d-m-Y" }}</td>
+                        <td><span class="container-link">{{ row.container_number }}</span></td>
+                        <td><span class="category-badge {% if 'meat' in row.category|lower %}meat{% elif 'bean' in row.category|lower %}beans{% endif %}">{{ row.display_category }}</span></td>
+                        <td>{{ row.stock_item|default:"-" }}</td>
+                        <td style="font-size: 9px; max-width: 180px;">
+                            {% for pb in row.production_batches %}
+                            <span style="display: inline-block; background: #e8f4fc; padding: 1px 4px; border-radius: 3px; margin: 1px;"><strong>{{ pb.batch_number }}</strong> {{ pb.size }}</span>
+                            {% empty %}-{% endfor %}
+                        </td>
+                        <td class="qty">{{ row.balance_prev|floatformat:0 }}</td>
+                        <td class="qty">{{ row.book_out_qty|floatformat:0 }}</td>
+                        <td class="qty">{{ row.stock_left|floatformat:0 }}</td>
+                        <td class="qty">{{ row.used_defrosted|floatformat:0 }}</td>
+                        <td class="qty {% if row.loss_from_frozen_filling > 40 %}loss-bad{% elif row.loss_from_frozen_filling > 30 %}loss-warning{% else %}loss-good{% endif %}">{{ row.loss_from_frozen_filling|floatformat:1 }}%</td>
+                        <td class="qty {% if row.loss_from_frozen_pouch > 60 %}loss-bad{% elif row.loss_from_frozen_pouch > 50 %}loss-warning{% else %}loss-good{% endif %}">{{ row.loss_from_frozen_pouch|floatformat:1 }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="no-data">No usage data found matching the filters</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function showTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.report-tab-content').forEach(function(tab) {
+        tab.classList.remove('active');
+    });
+    
+    // Reset all tab buttons to inactive style
+    document.getElementById('btn-container').style.background = '#e9ecef';
+    document.getElementById('btn-container').style.color = '#555';
+    document.getElementById('btn-container').style.borderColor = '#ccc';
+    document.getElementById('btn-daily').style.background = '#e9ecef';
+    document.getElementById('btn-daily').style.color = '#555';
+    document.getElementById('btn-daily').style.borderColor = '#ccc';
+    
+    // Show selected tab and style active button
+    document.getElementById('tab-' + tabName).classList.add('active');
+    document.getElementById('btn-' + tabName).style.background = '#417690';
+    document.getElementById('btn-' + tabName).style.color = '#fff';
+    document.getElementById('btn-' + tabName).style.borderColor = '#417690';
+}
+
+function toggleDetails(detailsId, headerRow) {
+    var detailsRow = document.getElementById(detailsId);
+    if (detailsRow.classList.contains('show')) {
+        detailsRow.classList.remove('show');
+        headerRow.classList.remove('expanded');
+    } else {
+        detailsRow.classList.add('show');
+        headerRow.classList.add('expanded');
+    }
+}
+</script>
+{% endblock %}

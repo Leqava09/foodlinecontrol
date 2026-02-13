@@ -1,0 +1,21 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block content_title %}
+    {% if add %}
+        <h1>{% trans "Add stock item" %}</h1>
+    {% else %}
+        <h1>{{ page_title|default:_("View stock item") }}</h1>
+    {% endif %}
+{% endblock %}
+
+{% block submit_buttons_bottom %}
+    {{ block.super }}
+
+    {% if original and original.transaction_type == "IN" %}
+        <div class="submit-row">
+            <input type="submit" value="Stock Transfer" name="_transfer">
+            <input type="submit" value="Damage / Scrap" name="_scrap">
+        </div>
+    {% endif %}
+{% endblock %}

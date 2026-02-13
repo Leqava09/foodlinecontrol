@@ -1,0 +1,314 @@
+{% extends "admin/base_site.html" %}
+{% load static i18n %}
+
+{% block title %}{{ title }} | {% trans 'Django administration' %}{% endblock %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <style>
+        .section {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .form-row {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .form-row:last-child {
+            border-bottom: none;
+        }
+        .form-row label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+            font-size: 13px;
+        }
+
+        /* Just make selects a bit wider than default admin */
+        .form-row select {
+			width: 350px;          /* current width – keep or tweak */
+			max-width: 100%;
+			padding: 6px 8px;      /* horizontal + some vertical padding */
+			font-size: 13px;
+			line-height: 1.6;      /* more vertical room so letters like p,g,y are visible */
+			height: auto;          /* let browser choose correct height */
+		}
+
+        .form-row input {
+            width: 350px;
+            max-width: 100%;
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+
+        .submit-row {
+            padding: 15px 0;
+            text-align: left;
+        }
+        .default {
+            background-color: #417690;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            text-decoration: none;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .default:hover { background-color: #2e5266; }
+        .cancel { background-color: #6c757d !important; }
+        .cancel:hover { background-color: #545b62 !important; }
+
+        h2 {
+            background-color: #f8f9fa;
+            padding: 10px 15px;
+            margin: 0 0 15px 0;
+            border-left: 4px solid #417690;
+            font-size: 15px;
+            font-weight: 600;
+            color: #333;
+        }
+        .errorlist {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 8px;
+            margin: 8px 0;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+            font-size: 12px;
+        }
+        .auto-filled {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <form method="post" id="staff-user-form">
+        {% csrf_token %}
+        
+        <div class="section">
+            <h2>👥 Select Staff Member</h2>
+            
+            <div class="form-row">
+                <label for="{{ staff_form.department.id_for_label }}">{{ staff_form.department.label }}</label>
+                {{ staff_form.department }}
+                {% if staff_form.department.errors %}
+                    <ul class="errorlist">{% for error in staff_form.department.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                {% endif %}
+            </div>
+            
+            <div class="form-row">
+                <label for="{{ staff_form.position_level.id_for_label }}">{{ staff_form.position_level.label }}</label>
+                {{ staff_form.position_level }}
+                {% if staff_form.position_level.errors %}
+                    <ul class="errorlist">{% for error in staff_form.position_level.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                {% endif %}
+            </div>
+            
+            <div class="form-row">
+                <label for="{{ staff_form.person.id_for_label }}">{{ staff_form.person.label }}</label>
+                <span id="person-loading" class="loading">🔄 Loading employees...</span>
+                {{ staff_form.person }}
+                {% if staff_form.person.errors %}
+                    <ul class="errorlist">{% for error in staff_form.person.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔐 Create Login Details</h2>
+            
+            {% if user_form.non_field_errors %}
+                <ul class="errorlist">{% for error in user_form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+            {% endif %}
+            
+            <div class="form-row">
+				<label for="{{ user_form.username.id_for_label }}">{{ user_form.username.label }}</label>
+				<input type="text" name="username" id="{{ user_form.username.id_for_label }}"
+					   value="" class="vTextField">
+				{% if user_form.username.errors %}
+					<ul class="errorlist">{% for error in user_form.username.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+				{% endif %}
+				<small class="help">Auto-filled from selected employee (you can edit it)</small>
+			</div>
+            
+            <div class="form-row">
+				<label for="{{ user_form.password1.id_for_label }}">{{ user_form.password1.label }}</label>
+				<input type="password" name="password1" id="{{ user_form.password1.id_for_label }}"
+					   value="" class="vTextField">
+				{% if user_form.password1.errors %}
+					<ul class="errorlist">{% for error in user_form.password1.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+				{% endif %}
+			</div>
+
+			<div class="form-row">
+				<label for="{{ user_form.password2.id_for_label }}">{{ user_form.password2.label }}</label>
+				<input type="password" name="password2" id="{{ user_form.password2.id_for_label }}"
+					   value="" class="vTextField">
+				{% if user_form.password2.errors %}
+					<ul class="errorlist">{% for error in user_form.password2.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+				{% endif %}
+			</div>
+
+        </div>
+
+        <div class="submit-row">
+            <input type="submit" value="✅ Create Staff User" class="default">
+            <a href="{% url 'admin:auth_user_add' %}" class="default cancel">❌ Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const deptSelect = document.querySelector('select[name="department"]');
+    const posLevelSelect = document.querySelector('select[name="position_level"]');
+    const personSelect = document.querySelector('select[name="person"]');
+    const personLoading = document.getElementById('person-loading');
+    const usernameField = document.querySelector('input[name="username"]');
+    const password1Field = document.querySelector('input[name="password1"]');
+    const password2Field = document.querySelector('input[name="password2"]');
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    function resetLoginFields() {
+		usernameField.value = '';
+		usernameField.classList.remove('auto-filled');
+		// REMOVE this line:
+		// usernameField.readOnly = true;
+		password1Field.value = '';
+		password2Field.value = '';
+		password1Field.disabled = true;
+		password2Field.disabled = true;
+	}
+
+    function updatePersons() {
+        const deptId = deptSelect.value;
+        const posLevelId = posLevelSelect.value;
+        
+        personLoading.style.display = 'inline';
+        personSelect.disabled = true;
+        personSelect.innerHTML = '<option value="">---------</option>';
+        resetLoginFields();
+        
+        if (deptId || posLevelId) {
+            const params = new URLSearchParams();
+            if (deptId) params.append('department_id', deptId);
+            if (posLevelId) params.append('position_level_id', posLevelId);
+            
+            // Get the base URL from current location
+            const currentUrl = new URL(window.location.href);
+            const baseUrl = currentUrl.pathname.replace(/add-staff\/$/, '');
+            const apiUrl = baseUrl + 'get-persons/?' + params.toString();
+            
+            fetch(apiUrl, {
+                headers: { 'X-CSRFToken': csrfToken }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                personLoading.style.display = 'none';
+                personSelect.disabled = false;
+                
+                if (data.persons?.length > 0) {
+                    data.persons.forEach(person => {
+                        const option = document.createElement('option');
+                        option.value = person.id;
+                        option.textContent = person.name;
+                        personSelect.appendChild(option);
+                    });
+                } else {
+                    const option = document.createElement('option');
+                    option.value = "";
+                    option.textContent = "No employees found";
+                    personSelect.appendChild(option);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                personLoading.style.display = 'none';
+                personSelect.disabled = false;
+            });
+        } else {
+            personLoading.style.display = 'none';
+            personSelect.disabled = false;
+        }
+    }
+    
+    function autoFillLoginFromServer(personId) {
+		if (!personId) {
+			resetLoginFields();
+			return;
+		}
+		
+		// Get the base URL from current location
+		const currentUrl = new URL(window.location.href);
+		const baseUrl = currentUrl.pathname.replace(/add-staff\/$/, '');
+		const apiUrl = baseUrl + 'get-person-details/?person_id=' + personId;
+		
+		fetch(apiUrl, {
+			headers: { 'X-CSRFToken': csrfToken }
+		})
+		.then(response => {
+			if (!response.ok) {
+				throw new Error(`HTTP error! status: ${response.status}`);
+			}
+			return response.json();
+		})
+		.then(data => {
+			if (data.error) {
+				resetLoginFields();
+				return;
+			}
+			// Default username = capitalised first name (e.g. "Peter")
+			const defaultUsername = (data.first_name || '').trim();
+
+			// Only set if field is currently empty, so user edits are preserved
+			if (!usernameField.value) {
+				usernameField.value = defaultUsername;
+			}
+			usernameField.classList.add('auto-filled');
+			// Make sure it stays editable
+			usernameField.readOnly = false;
+
+			// Enable passwords once employee chosen
+			password1Field.disabled = false;
+			password2Field.disabled = false;
+		})
+		.catch(err => {
+			console.error('Error loading person details:', err);
+			resetLoginFields();
+		});
+	}
+    
+    if (deptSelect) deptSelect.addEventListener('change', updatePersons);
+    if (posLevelSelect) posLevelSelect.addEventListener('change', updatePersons);
+    if (personSelect) {
+        personSelect.addEventListener('change', function() {
+            const personId = this.value;
+            autoFillLoginFromServer(personId);
+        });
+    }
+
+    // initial state on load
+    resetLoginFields();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,115 @@
+/* Center all merged columns */
+#result_list td.field-production_date_display,
+#result_list td.field-batch,
+#result_list td.field-product_name,
+#result_list td.field-size,
+#result_list td.field-warehouse_display,
+#result_list td.field-transaction_date_display {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
+/* Alternate batch group colors */
+#result_list tbody tr:nth-child(4n+1),
+#result_list tbody tr:nth-child(4n+2) {
+    background-color: #e3f2fd !important;  /* Light blue */
+}
+
+#result_list tbody tr:nth-child(4n+3),
+#result_list tbody tr:nth-child(4n+4) {
+    background-color: #e8f5e9 !important;  /* Light green */
+}
+
+/* Transaction type text colors (no background override) */
+#result_list tbody tr.tx-dispatch-row th.field-transaction_type_display a {
+    color: #f57c00 !important;  /* Orange */
+    font-weight: 600;
+}
+
+#result_list tbody tr.tx-transfer-row th.field-transaction_type_display a {
+    color: #7b1fa2 !important;  /* Purple */
+    font-weight: 600;
+}
+
+#result_list tbody tr.tx-scrap-row th.field-transaction_type_display a {
+    color: #b71c1c !important;  /* Red */
+    font-weight: 600;
+}
+
+/* Dispatch quantity in orange */
+#result_list tr.tx-dispatch-row td.field-movement_quantity_display,
+#result_list tr.tx-dispatch-row td.field-quantity {
+    color: #f57c00 !important;
+    font-weight: 600;
+}
+
+/* Transfer quantity in purple */
+#result_list tr.tx-transfer-row td.field-movement_quantity_display,
+#result_list tr.tx-transfer-row td.field-quantity {
+    color: #7b1fa2 !important;
+    font-weight: 600;
+}
+
+/* Damage/Scrap quantity in red */
+#result_list tr.tx-scrap-row td.field-movement_quantity_display,
+#result_list tr.tx-scrap-row td.field-quantity {
+    color: #b71c1c !important;
+    font-weight: 600;
+}
+
+/* Ready-to-dispatch quantity in green */
+#result_list td.field-bookin_ready_display {
+    text-align: center !important;
+    vertical-align: middle !important;
+    font-weight: 700 !important;
+    color: #1b5e20 !important;
+}
+
+/* Center ALL columns */
+#result_list th,
+#result_list td {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
+/* Exception: Keep Product name left-aligned */
+#result_list td.field-product_name {
+    text-align: left !important;
+    padding-left: 10px !important;
+}
+
+/* Slim columns */
+#result_list th:nth-child(2),
+#result_list td:nth-child(2),
+#result_list th:nth-child(3),
+#result_list td:nth-child(3) {
+    width: 120px !important;
+    max-width: 120px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#result_list th:nth-child(14),
+#result_list td:nth-child(14) {
+    width: 130px !important;
+    max-width: 130px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12px;
+}
+
+/* Hide warehouse field in Book In form */
+.grp-row:has(#id_to_warehouse),
+.form-row:has(#id_to_warehouse) {
+    display: none !important;
+}
+/* Batch group alternating colors - high specificity */
+#result_list tbody tr.batch-group-even {
+  background-color: #e3f2fd !important;
+}
+
+#result_list tbody tr.batch-group-odd {
+  background-color: #e8f5e9 !important;
+}

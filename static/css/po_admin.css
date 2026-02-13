@@ -1,0 +1,77 @@
+/* PO Admin Custom Styles */
+
+/* Status badges */
+.purchase-order-status {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.status-draft { background: #ffc107; color: #000; }
+.status-sent { background: #17a2b8; color: #fff; }
+.status-acknowledged { background: #007bff; color: #fff; }
+.status-received { background: #28a745; color: #fff; }
+.status-closed { background: #6c757d; color: #fff; }
+
+/* Action icons alignment */
+.grp-td .fa, .grp-th .fa {
+    font-size: 16px;
+}
+
+/* Line item inline table improvements */
+.grp-tabular .grp-table thead th {
+    white-space: nowrap;
+}
+
+.grp-tabular .grp-table tbody td input[type="text"],
+.grp-tabular .grp-table tbody td input[type="number"] {
+    min-width: 100px;
+}
+
+/* Hide "Today" and "Now" links on date/time fields - aggressive hiding */
+.grp-now,
+.grp-date-shortcuts,
+.grp-time-shortcuts,
+.date-shortcuts,
+span.datetimeshortcuts,
+a.grp-shortcut,
+a[href*="javascript:DateTimeShortcuts"],
+.grp-row .grp-cell a:not(.grp-calendar-icon):not([class*="calendar"]):not([class*="clock"]) {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* Specifically hide text "Tod" and "Today" */
+a[onclick*="DateTimeShortcuts.handleCalendarQuickLink"],
+a[onclick*="Now"] {
+    display: none !important;
+}
+
+/* Keep the calendar/clock icons visible */
+.grp-calendar-icon,
+.grp-clock-icon,
+.ui-datepicker-trigger,
+img[src*="calendar"],
+img[src*="clock"] {
+    display: inline-block !important;
+    visibility: visible !important;
+}
+
+/* Fix help text icon overlap in PO inline */
+.field-unit_price .help,
+.inline-related .field-unit_price .help {
+    display: inline-block;
+    margin-left: 5px;
+    white-space: nowrap;
+}
+
+.field-unit_price label {
+    display: inline-block;
+}
+
+/* Ensure tabular inline cells don't collapse */
+.inline-related.grp-tabular .field-unit_price {
+    min-width: 180px;
+}

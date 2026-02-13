@@ -1,0 +1,593 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .import-data-button {
+        background-color: #417690;
+        color: white;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-top: 10px;
+        margin-bottom: 20px;
+        font-size: 13px;
+    }
+    .import-data-button-inline {
+        background-color: #417690;
+        color: white;
+        padding: 4px 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-left: 5px;
+        font-size: 12px;
+        vertical-align: middle;
+    }
+    .import-data-button:hover,
+    .import-data-button-inline:hover {
+        background-color: #205067;
+    }
+    .readonly-field {
+        background-color: #f0f0f0;
+        padding: 4px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin: 2px 0;
+    }
+    .pulled-data-section {
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        padding: 15px;
+        border-radius: 4px;
+        margin: 15px 0;
+        display: none;
+    }
+    .pulled-data-section.visible {
+        display: block;
+    }
+    .pulled-data-row {
+        display: grid;
+        grid-template-columns: 200px 200px;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+    .pulled-data-item {
+        display: flex;
+        flex-direction: column;
+    }
+    .pulled-data-label {
+        font-weight: bold;
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 5px;
+    }
+    .batch-table-section {
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        padding: 15px;
+        border-radius: 4px;
+        margin: 20px 0;
+        display: none;
+        overflow-x: auto;
+    }
+    .batch-table-section.visible {
+        display: block;
+    }
+    .batch-table-section table {
+        width: auto;
+        border-collapse: collapse;
+        font-size: 12px;
+    }
+    .batch-table-section th,
+    .batch-table-section td {
+        padding: 4px 3px;
+        border: 1px solid #ddd;
+        text-align: center;
+    }
+    .batch-table-section th:nth-child(1),
+    .batch-table-section td:nth-child(1) {
+        text-align: center;
+        min-width: 100px;
+    }
+    .batch-table-section th:nth-child(2),
+    .batch-table-section td:nth-child(2) {
+        text-align: center;
+        min-width: 220px;
+    }
+    .batch-table-section th:nth-child(5),
+    .batch-table-section td:nth-child(5) {
+        text-align: center;
+    }
+    .batch-table-section th {
+        background-color: #417690;
+        color: white;
+        font-weight: bold;
+    }
+    .batch-table-section tr:nth-child(even) {
+        background-color: #f5f5f5;
+    }
+    .batch-table-section input {
+        width: 70px;
+        padding: 4px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        box-sizing: border-box;
+    }
+    
+    /* Style readonly document buttons to be visible and active */
+    .field-view_quote a,
+    .field-email_quote a,
+    .field-view_proforma a,
+    .field-email_proforma a,
+    .field-view_invoice a,
+    .field-email_invoice a,
+    .field-view_picking_slip a,
+    .field-email_picking_slip a,
+    .field-view_delivery_note a,
+    .field-email_delivery_note a {
+        color: #417690;
+        font-size: 16px;
+        margin-left: 8px;
+        text-decoration: none;
+        cursor: pointer;
+    }
+    
+    .field-view_quote a:hover,
+    .field-email_quote a:hover,
+    .field-view_proforma a:hover,
+    .field-email_proforma a:hover,
+    .field-view_invoice a:hover,
+    .field-email_invoice a:hover,
+    .field-view_picking_slip a:hover,
+    .field-email_picking_slip a:hover,
+    .field-view_delivery_note a:hover,
+    .field-email_delivery_note a:hover {
+        color: #205067;
+    }
+    
+    /* Gray out disabled icons when document not created */
+    .field-view_quote span,
+    .field-email_quote span,
+    .field-view_proforma span,
+    .field-email_proforma span,
+    .field-view_invoice span,
+    .field-email_invoice span,
+    .field-view_picking_slip span,
+    .field-email_picking_slip span,
+    .field-view_delivery_note span,
+    .field-email_delivery_note span {
+        color: #ccc;
+        font-size: 16px;
+        margin-left: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block form_top %}
+{{ block.super }}
+
+<!-- Status message about buttons -->
+<div style="background: #e8f4f8; border-left: 4px solid #417690; padding: 12px; margin-bottom: 20px; border-radius: 4px;">
+    <strong>ℹ️ Document Buttons:</strong> The view (👁️) and email (📧) buttons will be active once you save this record. 
+    After saving, you can change the billing method (Primary/Secondary/Pallet) and the document will adjust automatically.
+</div>
+
+<div id="pulledDataSection" class="pulled-data-section">
+    <h3>Data from Site Invoice</h3>
+    
+    <div class="pulled-data-row">
+        <div class="pulled-data-item">
+            <span class="pulled-data-label">Transporter</span>
+            <div class="readonly-field" id="pulled_transporters">-</div>
+        </div>
+        <div class="pulled-data-item">
+            <span class="pulled-data-label">Transport Cost</span>
+            <div class="readonly-field" id="pulled_transport_cost">-</div>
+        </div>
+    </div>
+
+    <!-- Batch Pricing Table Section -->
+    <div id="batchTableSection" class="batch-table-section">
+        <h3 style="margin-top: 0; color: #417690;">Batch Pricing & Approval (Line Preview)</h3>
+        <table id="batchPricingTable">
+            <thead>
+                <tr>
+                    <th>Batch</th>
+                    <th>Product</th>
+                    <th style="min-width: 65px;">Size</th>
+                    <th style="min-width: 85px;">Qty for Invoice</th>
+                    <th style="min-width: 80px;">Price/Unit</th>
+                    <th style="min-width: 70px;">Selling Price</th>
+                </tr>
+            </thead>
+            <tbody id="batchTableBody">
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+// Add the import button next to the invoice number field
+document.addEventListener('DOMContentLoaded', function() {
+    // Move the pulled data section to just after the Dates fieldset
+    const pulledDataSection = document.getElementById('pulledDataSection');
+    const datesFieldset = Array.from(document.querySelectorAll('fieldset')).find(fs => fs.textContent.includes('Dates'));
+    if (pulledDataSection && datesFieldset) {
+        datesFieldset.parentNode.insertBefore(pulledDataSection, datesFieldset.nextSibling);
+    }
+    
+    // Make billing method checkboxes act like radio buttons (same as site billing)
+    const billingCheckboxes = document.querySelectorAll('input[name="bill_per_primary"], input[name="bill_per_secondary"], input[name="bill_per_pallet"]');
+    billingCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                billingCheckboxes.forEach(cb => {
+                    if (cb !== this) cb.checked = false;
+                });
+            }
+            // Update document preview link with current billing method
+            updateDocumentLinks();
+        });
+    });
+    
+    // Function to update document links with billing method parameter
+    function updateDocumentLinks() {
+        let billingMethod = '';
+        if (document.querySelector('input[name="bill_per_primary"]').checked) {
+            billingMethod = 'primary';
+        } else if (document.querySelector('input[name="bill_per_secondary"]').checked) {
+            billingMethod = 'secondary';
+        } else if (document.querySelector('input[name="bill_per_pallet"]').checked) {
+            billingMethod = 'pallet';
+        }
+        
+        // Update all document preview links
+        document.querySelectorAll('a[href*="/costing/billing/preview/"]').forEach(link => {
+            const baseUrl = link.href.split('?')[0];
+            if (billingMethod) {
+                link.href = baseUrl + '?billing_method=' + billingMethod;
+            } else {
+                link.href = baseUrl;
+            }
+        });
+    }
+    
+    // Initialize document links on page load
+    updateDocumentLinks();
+    
+    // Function to collect and save selling prices
+    function collectAndSavePrices() {
+        const qtyField = document.getElementById('id_qty_for_invoice_data');
+        if (!qtyField) {
+            console.log('ERROR: qty field not found');
+            return;
+        }
+        
+        try {
+            // Get all price inputs from table
+            const priceInputs = document.querySelectorAll('#batchTableBody tr td:nth-child(6) input');
+            console.log('Collecting prices - found', priceInputs.length, 'price inputs');
+            
+            if (priceInputs.length === 0) {
+                console.log('No price inputs found, skipping price collection');
+                return;
+            }
+            
+            // Build selling prices object from table
+            const sellingPrices = {};
+            priceInputs.forEach((input, idx) => {
+                const row = input.closest('tr');
+                const batchCell = row.querySelector('td:nth-child(1)');
+                if (batchCell) {
+                    const batchId = batchCell.textContent.trim();
+                    const price = parseFloat(input.value) || 0;
+                    // Always format to 2 decimals
+                    sellingPrices[batchId] = parseFloat(price.toFixed(2));
+                    console.log('>> Collected:', batchId, '=', sellingPrices[batchId]);
+                }
+            });
+            
+            console.log('=== TOTAL PRICES COLLECTED:', Object.keys(sellingPrices).length, '===');
+            
+            // Get current data from form field
+            const currentValue = qtyField.value;
+            console.log('Current form field length:', currentValue.length);
+            
+            let dataToSave;
+            try {
+                dataToSave = JSON.parse(currentValue);
+            } catch(e) {
+                console.log('Could not parse form field, using empty');
+                dataToSave = {};
+            }
+            
+            // If no batch_data, get from localStorage
+            if (!dataToSave.batch_data) {
+                const storedData = localStorage.getItem('pulledInvoiceData');
+                if (storedData) {
+                    try {
+                        const complete = JSON.parse(storedData);
+                        if (complete.batch_data) {
+                            console.log('>> Using batch_data from localStorage');
+                            dataToSave = complete;
+                        }
+                    } catch(e) {
+                        console.error('Could not parse localStorage');
+                    }
+                }
+            }
+            
+            // Add selling prices
+            dataToSave.selling_prices = sellingPrices;
+            
+            // Save back to form field
+            const finalJson = JSON.stringify(dataToSave);
+            qtyField.value = finalJson;
+            console.log('=== SAVED TO FORM FIELD, length:', finalJson.length, '===');
+            console.log('>> Form field now contains selling_prices:', !!dataToSave.selling_prices);
+            console.log('>> Selling prices object:', dataToSave.selling_prices);
+            
+        } catch(e) {
+            console.error('ERROR in collectAndSavePrices:', e);
+        }
+    }
+    
+    // Method 1: Hook the form submit event directly (most reliable)
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            console.log('=== FORM SUBMIT EVENT FIRED ===');
+            collectAndSavePrices();
+        });
+        console.log('>> Attached form submit listener');
+        
+        // Method 2: Also intercept Save button clicks before form submit
+        form.addEventListener('click', function(e) {
+            const button = e.target.closest('button[type="submit"], input[type="submit"]');
+            if (button) {
+                console.log('=== SAVE BUTTON CLICKED ===', button.value || button.textContent);
+                collectAndSavePrices();
+            }
+        });
+        console.log('>> Attached form click delegation listener');
+    } else {
+        console.log('ERROR: Form element not found!');
+    }
+    
+    // Method 3: Also attach to any dynamically added buttons
+    const saveButtons = document.querySelectorAll('button[type="submit"], input[type="submit"]');
+    console.log('Found', saveButtons.length, 'save buttons');
+    
+    saveButtons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            console.log('=== DIRECT BUTTON CLICK ===', btn.value || btn.textContent);
+            collectAndSavePrices();
+        }, true); // Use capture phase
+    });
+    
+    // On page load, check if we have saved batch data and show sections if so
+    const qtyForInvoiceField = document.getElementById('id_qty_for_invoice_data');
+    if (qtyForInvoiceField && qtyForInvoiceField.value) {
+        try {
+            console.log('=== PAGE LOAD: Restoring saved data ===');
+            const savedQtyData = JSON.parse(qtyForInvoiceField.value);
+            console.log('Parsed form field data:', savedQtyData);
+            
+            // Check if we have data to display
+            const hasData = savedQtyData && (savedQtyData.batch_data || Object.keys(savedQtyData).length > 0);
+            
+            if (hasData) {
+                // Show the sections
+                document.getElementById('pulledDataSection').classList.add('visible');
+                document.getElementById('batchTableSection').classList.add('visible');
+                
+                // Get selling prices from form field
+                let savedSellingPrices = savedQtyData.selling_prices || {};
+                console.log('Selling prices from form field:', savedSellingPrices);
+                
+                // Try to get display data from localStorage
+                const storedData = localStorage.getItem('pulledInvoiceData');
+                if (storedData) {
+                    try {
+                        const completeData = JSON.parse(storedData);
+                        console.log('Found localStorage data');
+                        
+                        // Populate transporter and cost fields
+                        if (completeData.transporters_name) {
+                            document.getElementById('pulled_transporters').textContent = completeData.transporters_name;
+                        }
+                        if (completeData.transport_cost) {
+                            document.getElementById('pulled_transport_cost').textContent = completeData.transport_cost;
+                        }
+                        
+                        // Use localStorage selling prices if form field doesn't have them
+                        if (completeData.selling_prices && Object.keys(savedSellingPrices).length === 0) {
+                            savedSellingPrices = completeData.selling_prices;
+                            console.log('Using selling prices from localStorage:', savedSellingPrices);
+                        }
+                        
+                        // Rebuild the batch table
+                        if (completeData.batch_data && completeData.batch_data.length > 0) {
+                            console.log('Rebuilding batch table with', completeData.batch_data.length, 'batches');
+                            populateBatchTable(completeData.batch_data);
+                            
+                            // Restore selling prices if they exist
+                            if (Object.keys(savedSellingPrices).length > 0) {
+                                console.log('Restoring selling prices');
+                                Object.entries(savedSellingPrices).forEach(([batchId, price]) => {
+                                    const rows = document.querySelectorAll('#batchTableBody tr');
+                                    rows.forEach(row => {
+                                        const batchCell = row.querySelector('td:nth-child(1)');
+                                        if (batchCell && batchCell.textContent.trim() === batchId) {
+                                            const priceInput = row.querySelector('td:nth-child(6) input');
+                                            if (priceInput) {
+                                                // Ensure 2 decimal places
+                                                priceInput.value = parseFloat(price).toFixed(2);
+                                                console.log('Restored price for', batchId, '=', parseFloat(price).toFixed(2));
+                                            }
+                                        }
+                                    });
+                                });
+                            }
+                        }
+                    } catch(e) {
+                        console.error('Error parsing localStorage:', e);
+                    }
+                } else {
+                    console.log('No localStorage data, checking if form field has batch_data');
+                    if (savedQtyData.batch_data && savedQtyData.batch_data.length > 0) {
+                        console.log('Found batch_data in form field, rebuilding table');
+                        populateBatchTable(savedQtyData.batch_data);
+                        
+                        // Restore selling prices if they exist in form field
+                        if (Object.keys(savedSellingPrices).length > 0) {
+                            console.log('Restoring selling prices from form field');
+                            Object.entries(savedSellingPrices).forEach(([batchId, price]) => {
+                                const rows = document.querySelectorAll('#batchTableBody tr');
+                                rows.forEach(row => {
+                                    const batchCell = row.querySelector('td:nth-child(1)');
+                                    if (batchCell && batchCell.textContent.trim() === batchId) {
+                                        const priceInput = row.querySelector('td:nth-child(6) input');
+                                        if (priceInput) {
+                                            // Ensure 2 decimal places
+                                            priceInput.value = parseFloat(price).toFixed(2);
+                                            console.log('Restored price for', batchId, '=', parseFloat(price).toFixed(2));
+                                        }
+                                    }
+                                });
+                            });
+                        }
+                    }
+                }
+            }
+        } catch(e) {
+            console.error('ERROR: Not valid JSON in form field:', e);
+        }
+    }
+    
+    // Add pull data button functionality
+    const invoiceInput = document.getElementById('id_import_invoice_number');
+    if (invoiceInput && !document.getElementById('pullDataBtn')) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'import-data-button-inline';
+        button.id = 'pullDataBtn';
+        button.textContent = '⬇';
+        button.onclick = function(e) {
+            e.preventDefault();
+            pullInvoiceData();
+        };
+        invoiceInput.parentNode.insertBefore(button, invoiceInput.nextSibling);
+    }
+});
+
+function pullInvoiceData() {
+    const siteId = document.getElementById('id_import_site').value;
+    const invoiceNumber = document.getElementById('id_import_invoice_number').value;
+    
+    if (!siteId || !invoiceNumber) {
+        alert('Please select both Site and Invoice Number first');
+        return;
+    }
+    
+    // Call the API endpoint
+    fetch('/costing/api/get-site-invoice-data/?site_id=' + siteId + '&invoice_number=' + invoiceNumber)
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to pull invoice data');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Populate the read-only fields
+            document.getElementById('pulled_transporters').textContent = data.transporters_name || '-';
+            document.getElementById('pulled_transport_cost').textContent = data.transport_cost || '-';
+            
+            // Populate form fields with pulled data - EXCLUDING client, billing_date, due_date, currencies
+            if (data.exchange_rate) {
+                document.getElementById('id_exchange_rate').value = data.exchange_rate;
+            }
+            if (data.transporters && !document.getElementById('id_transporters').value) {
+                document.getElementById('id_transporters').value = data.transporters;
+            }
+            if (data.transport_cost) {
+                document.getElementById('id_transport_cost').value = data.transport_cost;
+            }
+            
+            // Store batch data for later use
+            window.pulledBatchData = data.batch_data || [];
+            window.pulledQtyForInvoiceData = data.qty_for_invoice_data || {};
+            
+            // Save complete data to localStorage for persistence across page reloads
+            const completeData = {
+                qty_mapping: data.qty_for_invoice_data || {},
+                batch_data: data.batch_data || [],
+                transporters_name: data.transporters_name || '-',
+                transport_cost: data.transport_cost || '-'
+            };
+            localStorage.setItem('pulledInvoiceData', JSON.stringify(completeData));
+            
+            // Save complete data structure to the form field so selling prices persist to database
+            document.getElementById('id_qty_for_invoice_data').value = JSON.stringify(completeData);
+            console.log('Saved to form field:', completeData);
+            
+            // Populate batch pricing table
+            populateBatchTable(data.batch_data || []);
+            
+            // Populate document checkboxes from site invoice
+            if (data.create_quote !== undefined) {
+                document.getElementById('id_create_quote').checked = data.create_quote;
+            }
+            if (data.create_proforma !== undefined) {
+                document.getElementById('id_create_proforma').checked = data.create_proforma;
+            }
+            if (data.create_invoice !== undefined) {
+                document.getElementById('id_create_invoice').checked = data.create_invoice;
+            }
+            if (data.create_picking_slip !== undefined) {
+                document.getElementById('id_create_picking_slip').checked = data.create_picking_slip;
+            }
+            if (data.create_delivery_note !== undefined) {
+                document.getElementById('id_create_delivery_note').checked = data.create_delivery_note;
+            }
+            
+            // Show the pulled data section and batch table
+            document.getElementById('pulledDataSection').classList.add('visible');
+            document.getElementById('batchTableSection').classList.add('visible');
+            
+            alert('Invoice data pulled successfully! The batch pricing table will now show the imported invoice prices.');
+        })
+        .catch(error => {
+            alert('Error pulling invoice data: ' + error.message);
+        });
+}
+
+function populateBatchTable(batchData) {
+    const tbody = document.getElementById('batchTableBody');
+    tbody.innerHTML = ''; // Clear existing rows
+    
+    if (!batchData || batchData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">No batch data available</td></tr>';
+        return;
+    }
+    
+    batchData.forEach(batch => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${batch.batch_id || '-'}</td>
+            <td>${batch.product_name || '-'}</td>
+            <td>${batch.size || '-'}</td>
+            <td>${batch.qty_for_invoice || '-'}</td>
+            <td>${parseFloat(batch.price_per_unit || 0).toFixed(2)}</td>
+            <td><input type="number" step="0.01" value="${parseFloat(batch.inv_price || 0).toFixed(2)}" placeholder="0.00" style="text-align: right;"></td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+</script>
+{% endblock %}

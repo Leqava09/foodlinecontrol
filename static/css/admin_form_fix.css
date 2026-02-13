@@ -1,0 +1,16 @@
+/* Prevent Enter from submitting main form */
+.form-row input[type="text"],
+.form-row input[type="number"],
+.form-row textarea,
+.form-row select {
+    /* Remove default form submit on Enter */
+}
+
+/* Override Grappelli Enter behavior */
+.grp-form-container input {
+    ime-mode: disabled; /* IE/Edge fix */
+}
+
+.submit-row input[type="submit"] {
+    /* Keep buttons working */
+}

@@ -1,0 +1,131 @@
+#recipes-0-items-group .unit_display_field,
+[id*="recipes"] [id*="items"] > div:last-child {
+    font-weight: bold !important;
+    text-align: center !important;
+    font-size: 13px !important;
+    min-height: 20px !important;
+    line-height: 20px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    vertical-align: middle !important;
+}
+
+/* Fix the category tabs container */
+#category-tabs-container {
+    padding-left: 24px !important;
+    margin-bottom: 0 !important;
+    margin-top: -10px !important;
+    padding-top: 10px !important;
+    border: none !important;
+    border-bottom: 3px solid rgb(44, 90, 160) !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+#category-tabs-container > div {
+    padding-left: 0 !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Remove borders from containers but NOT from tables */
+#grp-content-container,
+#grp-changelist,
+#grp-changelist-form,
+.grp-module,
+.grp-row,
+.l-2cr-fluid,
+.c-1,
+.c-2,
+aside,
+#tables-container {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Remove diagonal striped pattern */
+#tables-container,
+#tables-container *,
+[data-category-table],
+[data-category-table] *,
+.grp-changelist-results,
+.grp-changelist-results * {
+    background-image: none !important;
+}
+
+/* Table borders - clean and simple */
+.product-table {
+    border-collapse: collapse !important;
+    border: 2px solid #333 !important;
+}
+
+.product-table th {
+    border-right: 1px solid #fff !important;
+    border-bottom: 2px solid #333 !important;
+}
+
+.product-table th:last-child {
+    border-right: none !important;
+}
+
+.product-table td {
+    border-right: 1px solid #ddd !important;
+    border-bottom: 1px solid #ddd !important;
+}
+
+.product-table td:last-child {
+    border-right: none !important;
+}
+
+.product-table tr {
+    border-bottom: 1px solid #ddd !important;
+}
+
+.product-table tbody tr:last-child,
+.product-table tbody tr:last-child td {
+    border-bottom: none !important;
+}
+
+.product-table tbody td[rowspan] {
+    border-bottom: none !important;
+}
+
+/* Hide everything after the tables container */
+#tables-container ~ * {
+    display: none !important;
+}
+
+/* But keep the top pagination visible */
+#tables-container ~ .grp-module:first-of-type {
+    display: none !important;
+}
+/* Hide everything AFTER the tables - keep top pagination */
+#grp-changelist-form ~ * {
+    display: none !important;
+}
+/* Remove gap between tabs and table */
+#category-tabs-container {
+    padding-left: 24px !important;
+    margin-bottom: -3px !important;  /* Changed from -10px to -3px to close the gap */
+    margin-top: -10px !important;
+    padding-top: 10px !important;
+    border: none !important;
+    border-bottom: 3px solid rgb(44, 90, 160) !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* Also remove any spacing on the tables container */
+#tables-container {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* Ensure table headers sit flush with tab bottom */
+.product-table {
+    margin-top: 0 !important;
+}

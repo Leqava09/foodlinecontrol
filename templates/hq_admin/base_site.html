@@ -1,0 +1,55 @@
+{% extends "admin/base_site.html" %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+  /* HQ Navigation Bar */
+  .hq-nav-bar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+  .hq-nav-bar .site-name {
+    font-weight: bold;
+    font-size: 1.1em;
+  }
+  .hq-nav-bar a {
+    background: rgba(255,255,255,0.2);
+    color: white;
+    padding: 8px 16px;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: 500;
+  }
+  .hq-nav-bar a:hover {
+    background: rgba(255,255,255,0.3);
+  }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Fix the "Home" link in breadcrumbs to go to HQ Dashboard
+    var breadcrumbs = document.querySelectorAll('#grp-breadcrumb-menu a, .grp-breadcrumb a, .breadcrumbs a');
+    breadcrumbs.forEach(function(link) {
+        if (link.textContent.trim() === 'Home' || link.href.endsWith('/hq/admin/')) {
+            link.href = '/hq/';
+            link.textContent = 'HQ Dashboard';
+        }
+    });
+});
+</script>
+{% endblock %}
+
+{% block header %}
+  {{ block.super }}
+  <!-- HQ Navigation Bar -->
+  <div class="hq-nav-bar">
+    <div class="site-name">🏢 HQ Admin Console</div>
+    <a href="/hq/">← Back to HQ Home</a>
+  </div>
+{% endblock %}

@@ -1,0 +1,60 @@
+fieldset.billing-method .form-row {
+    display: flex;
+    gap: 20px;
+}
+
+fieldset.billing-method .form-row .field-box {
+    margin-right: 0;
+}
+
+.field-batch_pricing_preview_container .grp-readonly {
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+}
+
+.field-batch_pricing_preview_container {
+    border: none !important;
+    padding: 0 !important;
+}
+
+.batch_pricing_preview_container,
+.batch_pricing_preview_container .grp-readonly,
+.batch_pricing_preview_container table {
+    border-left: none !important;
+    border-right: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+}
+
+.batch_pricing_preview_container table td,
+.batch_pricing_preview_container table th {
+    border: 1px solid #ddd !important;
+}
+
+#id_qty_for_invoice_data {
+    display: none !important;
+}
+
+label[for="id_qty_for_invoice_data"] {
+    display: none !important;
+}
+
+.multi-date-container .grp-button {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 2px 10px;
+    min-width: 70px;      /* enough space for "Add date" */
+    white-space: nowrap;  /* prevent text wrapping */
+}
+/* Hide the batch_costings field - multiple selectors for specificity */
+.field-batch_costings,
+.form-row.field-batch_costings,
+div.field-batch_costings,
+.grp-row.grp-cells-1 .field-batch_costings {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+}

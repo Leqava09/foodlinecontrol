@@ -1,0 +1,53 @@
+/* Increase A-No field width */
+input[id$="-a_no"] {
+    width: 100px !important;
+    max-width: 120px;
+}
+
+/* Increase Production Code field width */
+input[id$="-batch_number"] {
+    width: 120px !important;
+    max-width: 150px;
+}
+
+/* Ensure SKU and Size fields are readable */
+input[id$="-sku"],
+input[id$="-size"] {
+    width: 80px;
+}
+
+/* Center size readonly display - STRONGEST SPECIFICITY */
+.grp-tbody .grp-row .grp-td.size,
+.grp-td.size {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    min-height: 35px !important;
+    padding: 0 !important;
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+}
+
+/* Hide Production Delete button */
+.grp-delete-link {
+    display: none !important;
+}
+
+/* Also target any div or span inside size column */
+.grp-td.size > * {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+}
+
+/* Ensure all td cells have proper vertical alignment */
+.grp-tbody .grp-row .grp-td {
+    vertical-align: middle !important;
+}
+
+
+

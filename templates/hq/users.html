@@ -1,0 +1,156 @@
+{% load hq_tags %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - FoodLineControl HQ</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+        .header h1 { font-size: 1.8em; }
+        .back-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .back-btn:hover { background: rgba(255,255,255,0.3); }
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 15px 20px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background: #f8f8f8;
+            font-weight: 600;
+            color: #333;
+        }
+        tr:hover { background: #f8f9ff; }
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85em;
+        }
+        .badge-hq { background: #e8f5e9; color: #2e7d32; }
+        .badge-site { background: #e3f2fd; color: #1565c0; }
+        .badge-none { background: #fafafa; color: #999; }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            font-size: 0.9em;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .messages { margin-bottom: 20px; }
+        .message {
+            padding: 15px;
+            border-radius: 5px;
+            background: white;
+        }
+        .message.success { background: #efe; color: #060; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👥 {{ title }}</h1>
+            <a href="{% url 'hq_dashboard' %}" class="back-btn">← Back to HQ</a>
+        </div>
+        
+        {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+            <div class="message {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <div class="card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Email</th>
+                        <th>Access Level</th>
+                        <th>Site</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>
+                            <strong>{{ user.username }}</strong>
+                            {% if user.first_name %}<br><small>{{ user.first_name }} {{ user.last_name }}</small>{% endif %}
+                        </td>
+                        <td>{{ user.email|default:'-' }}</td>
+                        <td>
+                            {% with us=user_sites|get_item:user.id %}
+                                {% if us and us.is_hq_user %}
+                                    <span class="badge badge-hq">🌍 HQ Admin</span>
+                                {% elif us and us.assigned_site %}
+                                    <span class="badge badge-site">🏭 Site User</span>
+                                {% else %}
+                                    <span class="badge badge-none">Not assigned</span>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td>
+                            {% with us=user_sites|get_item:user.id %}
+                                {% if us and us.is_hq_user %}
+                                    All Sites
+                                {% elif us and us.assigned_site %}
+                                    {{ us.assigned_site.name }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td>
+                            <a href="{% url 'hq_user_assign' user.id %}" class="btn btn-primary">Assign</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 40px; color: #999;">
+                            No users found
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
