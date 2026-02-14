@@ -1107,11 +1107,11 @@ def fix_docx_jinja_tags(docx_path):
         os.remove(temp_path)
         os.rename(temp_path + '.new', temp_path)
         
-        print(f"✓ Fixed template saved to: {temp_path}\n")
+        print(f"[OK] Fixed template saved to: {temp_path}\n")
         return temp_path
             
     except Exception as e:
-        print(f"✗ Warning: Could not fix DOCX tags: {e}")
+        print(f"[WARNING] Could not fix DOCX tags: {e}")
         import traceback
         traceback.print_exc()
         return docx_path
