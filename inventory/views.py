@@ -1410,7 +1410,7 @@ def po_document_preview(request, pk):
             docx_path,
         ]
         
-        result = run(cmd, capture_output=True, text=True, timeout=30)
+        result = run(cmd, capture_output=True, encoding='utf-8', errors='replace', timeout=30)
         
         if result.returncode != 0:
             os.unlink(docx_path)
