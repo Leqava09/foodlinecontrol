@@ -1391,7 +1391,8 @@ def po_document_preview(request, pk):
                 break
         
         if not libreoffice_path:
-            # Fallback: return DOCX if LibreOffice not available
+            # Fallback: return DOCX if LibreOffice not installed (temporary until server has LibreOffice)
+            print("LibreOffice not found - returning DOCX instead of PDF")
             with open(docx_path, 'rb') as f:
                 docx_content = f.read()
             os.unlink(docx_path)
@@ -1399,7 +1400,7 @@ def po_document_preview(request, pk):
                 docx_content,
                 content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
             )
-            response['Content-Disposition'] = f'inline; filename="PO-{po.po_number}.docx"'
+            response['Content-Disposition'] = f'attachment; filename="PO-{po.po_number}.docx"'
             return response
         
         # Run LibreOffice conversion

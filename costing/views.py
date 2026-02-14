@@ -1530,10 +1530,17 @@ def billing_document_preview(request, pk, doc_type):
                 break
         
         if not libreoffice_path:
-            return HttpResponse(
-                "LibreOffice is not installed on the server. Cannot convert DOCX to PDF.",
-                status=500
+            # Fallback: return DOCX if LibreOffice not installed (temporary until server has LibreOffice)
+            print("LibreOffice not found - returning DOCX instead of PDF")
+            with open(docx_path, 'rb') as f:
+                docx_content = f.read()
+            os.unlink(docx_path)
+            response = HttpResponse(
+                docx_content,
+                content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
             )
+            response['Content-Disposition'] = f'attachment; filename="{document_type}_{header.base_number}.docx"'
+            return response
         
         cmd = [
             libreoffice_path,
