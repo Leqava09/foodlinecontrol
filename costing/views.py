@@ -1512,7 +1512,28 @@ def billing_document_preview(request, pk, doc_type):
         # 3. Convert DOCX to PDF using LibreOffice
         pdf_path = docx_path.replace(".docx", ".pdf")
         
-        libreoffice_path = r"C:\Program Files\LibreOffice\program\soffice.exe"
+        # LibreOffice paths to try (Linux first, then Windows for local dev)
+        libreoffice_paths = [
+            "/usr/bin/libreoffice",
+            "/usr/bin/soffice",
+            "/opt/libreoffice/program/soffice",
+            "libreoffice",
+            "soffice",
+            r"C:\Program Files\LibreOffice\program\soffice.exe",
+            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+        ]
+        
+        libreoffice_path = None
+        for path in libreoffice_paths:
+            if os.path.exists(path):
+                libreoffice_path = path
+                break
+        
+        if not libreoffice_path:
+            return HttpResponse(
+                "LibreOffice is not installed on the server. Cannot convert DOCX to PDF.",
+                status=500
+            )
         
         cmd = [
             libreoffice_path,

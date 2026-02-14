@@ -1373,17 +1373,20 @@ def po_document_preview(request, pk):
         pdf_filename = docx_filename.replace('.docx', '.pdf')
         pdf_path = os.path.join(temp_dir, pdf_filename)
         
-        # LibreOffice paths to try
+        # LibreOffice paths to try (Linux first, then Windows for local dev)
         libreoffice_paths = [
+            "/usr/bin/libreoffice",
+            "/usr/bin/soffice",
+            "/opt/libreoffice/program/soffice",
+            "libreoffice",
+            "soffice",
             r"C:\Program Files\LibreOffice\program\soffice.exe",
             r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
-            "soffice",
-            "libreoffice",
         ]
         
         libreoffice_path = None
         for path in libreoffice_paths:
-            if os.path.exists(path) or path in ["soffice", "libreoffice"]:
+            if os.path.exists(path):
                 libreoffice_path = path
                 break
         
