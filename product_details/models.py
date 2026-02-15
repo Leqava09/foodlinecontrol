@@ -314,12 +314,20 @@ class MainProductComponent(models.Model):
     
 class RecipeCategory(models.Model):
     """Top-level recipe category (e.g., Sauce, Spices, Concentrate)"""
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
+    site = models.ForeignKey(
+        'tenants.Site',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name="Site"
+    )
     
     class Meta:
         verbose_name = "Recipe Category"
         verbose_name_plural = "Recipe Categories"
         ordering = ['name']
+        unique_together = [['name', 'site']]
     
     def __str__(self):
         return self.name

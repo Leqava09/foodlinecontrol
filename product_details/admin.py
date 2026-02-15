@@ -21,6 +21,23 @@ class ProductRecipeItemInline(admin.TabularInline):
     verbose_name_plural = "Recipe Items"
     can_delete = True
     
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Filter dropdowns by current site"""
+        current_site = getattr(request, 'current_site', None)
+        
+        if current_site:
+            if db_field.name == "category":
+                from inventory.models import StockItemCategories
+                kwargs["queryset"] = StockItemCategories.objects.filter(site=current_site)
+            elif db_field.name == "sub_category":
+                from inventory.models import StockItemSubCategory
+                kwargs["queryset"] = StockItemSubCategory.objects.filter(site=current_site)
+            elif db_field.name == "stock_item":
+                from inventory.models import StockItem
+                kwargs["queryset"] = StockItem.objects.filter(site=current_site)
+        
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    
     def unit_of_measure_display(self, obj):
         if obj.unit_of_measure:
             return obj.unit_of_measure.abbreviation or obj.unit_of_measure.name
@@ -37,6 +54,15 @@ class ProductRecipeInline(nested_admin.NestedTabularInline):
     inlines = [ProductRecipeItemInline]
     can_delete = True
     
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Filter recipe_category dropdown by current site"""
+        current_site = getattr(request, 'current_site', None)
+        
+        if current_site and db_field.name == "recipe_category":
+            kwargs["queryset"] = RecipeCategory.objects.filter(site=current_site)
+        
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    
 class MainStockItemInline(nested_admin.NestedTabularInline):
     """Main Stock Items"""
     model = ProductComponent
@@ -47,6 +73,23 @@ class MainStockItemInline(nested_admin.NestedTabularInline):
     verbose_name = "Product Stock Item"
     verbose_name_plural = "Product Stock Items"
     can_delete = True
+    
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Filter dropdowns by current site"""
+        current_site = getattr(request, 'current_site', None)
+        
+        if current_site:
+            if db_field.name == "category":
+                from inventory.models import StockItemCategories
+                kwargs["queryset"] = StockItemCategories.objects.filter(site=current_site)
+            elif db_field.name == "sub_category":
+                from inventory.models import StockItemSubCategory
+                kwargs["queryset"] = StockItemSubCategory.objects.filter(site=current_site)
+            elif db_field.name == "stock_item":
+                from inventory.models import StockItem
+                kwargs["queryset"] = StockItem.objects.filter(site=current_site)
+        
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
     
     def unit_of_measure_display(self, obj):
         if obj.unit_of_measure:
@@ -73,6 +116,23 @@ class MainProductComponentInline(nested_admin.NestedTabularInline):
     verbose_name = "Main Product Component"
     verbose_name_plural = "Main Product Components"
     can_delete = True
+    
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Filter dropdowns by current site"""
+        current_site = getattr(request, 'current_site', None)
+        
+        if current_site:
+            if db_field.name == "category":
+                from inventory.models import StockItemCategories
+                kwargs["queryset"] = StockItemCategories.objects.filter(site=current_site)
+            elif db_field.name == "sub_category":
+                from inventory.models import StockItemSubCategory
+                kwargs["queryset"] = StockItemSubCategory.objects.filter(site=current_site)
+            elif db_field.name == "stock_item":
+                from inventory.models import StockItem
+                kwargs["queryset"] = StockItem.objects.filter(site=current_site)
+        
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def unit_of_measure_display(self, obj):
         if obj.unit_of_measure:
@@ -334,7 +394,7 @@ class ProductCategoryAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
     def get_model_perms(self, request):
         return {}
         
-class RecipeCategoryAdmin(admin.ModelAdmin):
+class RecipeCategoryAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
     list_display = ['name', 'recipe_count']
     search_fields = ['name']
     fieldsets = (
@@ -342,6 +402,21 @@ class RecipeCategoryAdmin(admin.ModelAdmin):
             'fields': ('name',)
         }),
     )
+    
+    def get_queryset(self, request):
+        """Filter recipe categories by current site"""
+        qs = super().get_queryset(request)
+        current_site = getattr(request, 'current_site', None)
+        if current_site:
+            qs = qs.filter(site=current_site)
+        return qs
+    
+    def save_model(self, request, obj, form, change):
+        """Automatically set site when saving from site admin context"""
+        current_site = getattr(request, 'current_site', None)
+        if current_site:
+            obj.site = current_site
+        super().save_model(request, obj, form, change)
     
     def recipe_count(self, obj):
         count = obj.productrecipe_set.count()
