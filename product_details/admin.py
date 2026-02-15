@@ -27,11 +27,11 @@ class ProductRecipeItemInline(admin.TabularInline):
         
         if current_site:
             if db_field.name == "category":
-                from inventory.models import StockItemCategories
-                kwargs["queryset"] = StockItemCategories.objects.filter(site=current_site)
+                from inventory.models import StockCategory
+                kwargs["queryset"] = StockCategory.objects.filter(site=current_site)
             elif db_field.name == "sub_category":
-                from inventory.models import StockItemSubCategory
-                kwargs["queryset"] = StockItemSubCategory.objects.filter(site=current_site)
+                from inventory.models import StockSubCategory
+                kwargs["queryset"] = StockSubCategory.objects.filter(site=current_site)
             elif db_field.name == "stock_item":
                 from inventory.models import StockItem
                 kwargs["queryset"] = StockItem.objects.filter(site=current_site)
@@ -80,11 +80,11 @@ class MainStockItemInline(nested_admin.NestedTabularInline):
         
         if current_site:
             if db_field.name == "category":
-                from inventory.models import StockItemCategories
-                kwargs["queryset"] = StockItemCategories.objects.filter(site=current_site)
+                from inventory.models import StockCategory
+                kwargs["queryset"] = StockCategory.objects.filter(site=current_site)
             elif db_field.name == "sub_category":
-                from inventory.models import StockItemSubCategory
-                kwargs["queryset"] = StockItemSubCategory.objects.filter(site=current_site)
+                from inventory.models import StockSubCategory
+                kwargs["queryset"] = StockSubCategory.objects.filter(site=current_site)
             elif db_field.name == "stock_item":
                 from inventory.models import StockItem
                 kwargs["queryset"] = StockItem.objects.filter(site=current_site)
@@ -123,11 +123,11 @@ class MainProductComponentInline(nested_admin.NestedTabularInline):
         
         if current_site:
             if db_field.name == "category":
-                from inventory.models import StockItemCategories
-                kwargs["queryset"] = StockItemCategories.objects.filter(site=current_site)
+                from inventory.models import StockCategory
+                kwargs["queryset"] = StockCategory.objects.filter(site=current_site)
             elif db_field.name == "sub_category":
-                from inventory.models import StockItemSubCategory
-                kwargs["queryset"] = StockItemSubCategory.objects.filter(site=current_site)
+                from inventory.models import StockSubCategory
+                kwargs["queryset"] = StockSubCategory.objects.filter(site=current_site)
             elif db_field.name == "stock_item":
                 from inventory.models import StockItem
                 kwargs["queryset"] = StockItem.objects.filter(site=current_site)
