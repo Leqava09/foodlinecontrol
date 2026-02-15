@@ -15,6 +15,7 @@ db.sqlite3-journal
 # Environment variables - DO NOT COMMIT!
 .env
 .env.local
+.env.production
 
 # Virtual Environment
 .venv/
