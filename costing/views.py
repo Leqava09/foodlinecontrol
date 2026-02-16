@@ -1488,6 +1488,9 @@ def billing_document_preview(request, pk, doc_type):
         print(f"Document Type: {doc_type} ({document_type})")
         print(f"Template: {company.billing_template.path}")
         print(f"Site: {header.site.name if header.site else 'HQ'}")
+        print(f"Company Name: {context.get('company_name', 'MISSING')}")
+        print(f"Company Legal Name: {context.get('company_legal_name', 'MISSING')}")
+        print(f"Company Address Line 1: {context.get('company_address_line1', 'MISSING')}")
         print(f"\nContext variables being passed:")
         for key in sorted(context.keys()):
             value = context[key]

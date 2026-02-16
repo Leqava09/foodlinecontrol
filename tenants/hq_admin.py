@@ -1581,6 +1581,7 @@ class HQPurchaseOrderAdmin(PurchaseOrderAdmin):
     list_display = (
         'po_number', 'order_date_display', 'due_date_display',
         'site', 'currency', 'hq_total_display', 'status',
+        'view_po', 'email_po',
     )
     list_filter = ('status', 'currency', 'order_date', 'site')
     search_fields = ('po_number', 'site__name')

@@ -278,4 +278,34 @@ class CompanyDetails(models.Model):   # <<< rename from Companydetails
 
     def __str__(self):
         return self.name or "Company details"
+    
+    def save(self, *args, **kwargs):
+        """Override save to delete old template files when uploading new ones"""
+        if self.pk:  # Only for existing records (updating)
+            try:
+                old = CompanyDetails.objects.get(pk=self.pk)
+                
+                # Delete old billing_template if it's being replaced
+                if old.billing_template and old.billing_template != self.billing_template:
+                    if old.billing_template.storage.exists(old.billing_template.name):
+                        old.billing_template.delete(save=False)
+                
+                # Delete old po_template if it's being replaced
+                if old.po_template and old.po_template != self.po_template:
+                    if old.po_template.storage.exists(old.po_template.name):
+                        old.po_template.delete(save=False)
+                
+                # Delete old logo if it's being replaced
+                if old.logo and old.logo != self.logo:
+                    if old.logo.storage.exists(old.logo.name):
+                        old.logo.delete(save=False)
+                
+                # Delete old admin_background if it's being replaced
+                if old.admin_background and old.admin_background != self.admin_background:
+                    if old.admin_background.storage.exists(old.admin_background.name):
+                        old.admin_background.delete(save=False)
+            except CompanyDetails.DoesNotExist:
+                pass  # Object was deleted, ignore
+        
+        super().save(*args, **kwargs)
 
