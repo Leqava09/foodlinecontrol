@@ -1371,33 +1371,36 @@ def po_document_preview(request, pk):
         # 3. Convert DOCX to PDF using Python libraries (no LibreOffice needed)
         try:
             from costing.docx_to_pdf import docx_to_pdf_bytes
+            import sys
             
-            print("\n" + "="*60)
-            print("ATTEMPTING PO PDF CONVERSION")
-            print(f"DOCX Path: {docx_path}")
-            print(f"DOCX exists: {os.path.exists(docx_path)}")
-            print("="*60 + "\n")
+            # Log to both console and file
+            log_msg = f"\n{'='*60}\nATTEMPTING PO PDF CONVERSION\nDOCX Path: {docx_path}\nDOCX exists: {os.path.exists(docx_path)}\n{'='*60}\n"
+            print(log_msg, flush=True)
+            sys.stdout.flush()
+            with open('debug_pdf.log', 'a', encoding='utf-8') as f:
+                f.write(log_msg)
             
             pdf_content = docx_to_pdf_bytes(docx_path)
             
-            print("\n" + "="*60)
-            print("✓ PO PDF CONVERSION SUCCESSFUL!")
-            print(f"PDF size: {len(pdf_content)} bytes")
-            print("="*60 + "\n")
+            log_success = f"\n{'='*60}\n✓ PO PDF CONVERSION SUCCESSFUL!\nPDF size: {len(pdf_content)} bytes\n{'='*60}\n"
+            print(log_success, flush=True)
+            sys.stdout.flush()
+            with open('debug_pdf.log', 'a', encoding='utf-8') as f:
+                f.write(log_success)
             
             # Clean up temp DOCX file
             os.unlink(docx_path)
             
         except Exception as conversion_error:
             import traceback
+            import sys
             error_trace = traceback.format_exc()
             
-            print("\n" + "="*60)
-            print("✗ PO PDF CONVERSION FAILED!")
-            print(f"Error: {str(conversion_error)}")
-            print(f"Full traceback:\n{error_trace}")
-            print("Falling back to DOCX...")
-            print("="*60 + "\n")
+            log_error = f"\n{'='*60}\n✗ PO PDF CONVERSION FAILED!\nError: {str(conversion_error)}\nFull traceback:\n{error_trace}\nFalling back to DOCX...\n{'='*60}\n"
+            print(log_error, flush=True)
+            sys.stdout.flush()
+            with open('debug_pdf.log', 'a', encoding='utf-8') as f:
+                f.write(log_error)
             
             # Fallback: return DOCX if conversion fails
             with open(docx_path, 'rb') as f:
