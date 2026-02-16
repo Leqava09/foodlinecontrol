@@ -59,9 +59,53 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
             print(f"[X] {error_msg}")
             errors.append(error_msg)
     
-    # Method 2: Try pypandoc (if pandoc is installed)
+    # Method 2: Try LibreOffice (Linux, best quality conversion)
     try:
-        print("Trying Method 2: pypandoc")
+        print("Trying Method 2: LibreOffice")
+        import subprocess
+        
+        if pdf_path:
+            output_dir = os.path.dirname(pdf_path)
+        else:
+            output_dir = tempfile.gettempdir()
+        
+        # Run LibreOffice in headless mode to convert to PDF
+        result = subprocess.run([
+            'libreoffice', '--headless', '--convert-to', 'pdf',
+            '--outdir', output_dir, docx_path
+        ], capture_output=True, text=True, timeout=30)
+        
+        # LibreOffice creates PDF with same name as DOCX but .pdf extension
+        docx_basename = os.path.splitext(os.path.basename(docx_path))[0]
+        generated_pdf = os.path.join(output_dir, f"{docx_basename}.pdf")
+        
+        if result.returncode == 0 and os.path.exists(generated_pdf):
+            if pdf_path:
+                if generated_pdf != pdf_path:
+                    os.rename(generated_pdf, pdf_path)
+                print(f"[OK] Success with LibreOffice -> {pdf_path}")
+                return pdf_path
+            else:
+                with open(generated_pdf, 'rb') as f:
+                    buffer = BytesIO(f.read())
+                os.unlink(generated_pdf)
+                print(f"[OK] Success with LibreOffice -> BytesIO buffer")
+                return buffer
+        else:
+            raise Exception(f"LibreOffice conversion failed: {result.stderr}")
+            
+    except FileNotFoundError:
+        error_msg = "LibreOffice not found (install with: sudo apt-get install libreoffice)"
+        print(f"[X] {error_msg}")
+        errors.append(error_msg)
+    except Exception as e:
+        error_msg = f"LibreOffice failed: {str(e)}"
+        print(f"[X] {error_msg}")
+        errors.append(error_msg)
+    
+    # Method 3: Try pypandoc (if pandoc is installed)
+    try:
+        print("Trying Method 3: pypandoc")
         import pypandoc
         
         if pdf_path:
@@ -82,9 +126,9 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
         print(f"[X] {error_msg}")
         errors.append(error_msg)
     
-    # Method 3: Try python-docx + ReportLab (basic conversion)
+    # Method 4: Try python-docx + ReportLab (basic conversion, fallback)
     try:
-        print("Trying Method 3: python-docx + ReportLab")
+        print("Trying Method 4: python-docx + ReportLab (basic)")
         from docx import Document
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.units import inch
@@ -150,7 +194,7 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
     # All methods failed
     error_summary = "\n".join(errors)
     print(f"\n[X] All conversion methods failed:\n{error_summary}")
-    raise Exception(f"DOCX to PDF conversion failed. Tried 3 methods:\n{error_summary}")
+    raise Exception(f"DOCX to PDF conversion failed. Tried 4 methods:\n{error_summary}")
 
 
 def docx_to_pdf_bytes(docx_path):
