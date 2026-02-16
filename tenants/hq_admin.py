@@ -356,6 +356,61 @@ class HQClientAdmin(ClientAdmin):
         return super().get_queryset(request).filter(site__isnull=True)
 
 class HQCompanyDetailsAdmin(CompanyDetailsAdmin):
+    """Company Details admin for HQ - includes admin background setting"""
+    
+    list_display = ["name", "vat_number", "is_active"]  # Exclude 'site' column for HQ
+    
+    fieldsets = (
+        ("Identity", {
+            "fields": (
+                "name",
+                "legal_name",
+                "registration_number",
+                "vat_number",
+                "logo",
+            )
+        }),
+        ("Contact details", {
+            "fields": (
+                "address_line1",
+                "address_line2",
+                "city",
+                "province",
+                "postal_code",
+                "country",
+                "phone",
+                "email",
+                "website",
+            )
+        }),
+        ("Banking details", {
+            "fields": (
+                "bank_name",
+                "bank_account_name",
+                "bank_account_number",
+                "bank_branch_code",
+            )
+        }),
+        ("Document templates", {
+            "fields": (
+                "currency",
+                "billing_template",
+                "po_template",
+            )
+        }),
+        ("Admin Appearance", {
+            "fields": ("admin_background",),
+            "description": "Upload a JPEG/PNG image to display as background on the HQ admin dashboard."
+        }),
+        ("Status", {
+            "fields": ("is_active",),
+        }),
+    )
+    
+    def get_list_display(self, request):
+        """Override to prevent 'site' column from being added"""
+        return self.list_display
+    
     def get_queryset(self, request):
         return super().get_queryset(request).filter(site__isnull=True)
 
