@@ -1,23 +1,18 @@
 """
 DOCX to PDF Conversion Without LibreOffice
-Uses python-docx + ReportLab as a replacement for LibreOffice
+Tries multiple methods for maximum compatibility
 """
 
-from docx import Document
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib.units import inch
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT, TA_JUSTIFY
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
-from reportlab.lib import colors
 from io import BytesIO
 import os
+import sys
+import tempfile
 
 
 def convert_docx_to_pdf(docx_path, pdf_path=None):
     """
-    Convert DOCX to PDF using python-docx + ReportLab
-    Returns PDF path or BytesIO buffer if pdf_path is None
+    Convert DOCX to PDF using best available method
+    Tries multiple approaches for compatibility
     
     Args:
         docx_path: Path to input DOCX file
@@ -26,114 +21,129 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
     Returns:
         str or BytesIO: PDF file path or buffer
     """
-    # Load DOCX
-    doc = Document(docx_path)
+    print(f"\n=== DOCX to PDF Conversion ===")
+    print(f"Input: {docx_path}")
+    print(f"Output: {pdf_path or 'BytesIO buffer'}")
     
-    # Create PDF
-    if pdf_path:
-        buffer = pdf_path
-    else:
-        buffer = BytesIO()
+    errors = []
     
-    pdf = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=72,
-        leftMargin=72,
-        topMargin=72,
-        bottomMargin=18,
-    )
-    
-    # Container for PDF elements
-    story = []
-    styles = getSampleStyleSheet()
-    
-    # Custom styles
-    styles.add(ParagraphStyle(
-        name='CustomHeading',
-        parent=styles['Heading1'],
-        fontSize=16,
-        textColor=colors.HexColor('#1f4788'),
-        spaceAfter=12,
-        spaceBefore=12,
-    ))
-    
-    styles.add(ParagraphStyle(
-        name='CustomBody',
-        parent=styles['Normal'],
-        fontSize=10,
-        leading=14,
-    ))
-    
-    # Process DOCX content
-    for paragraph in doc.paragraphs:
-        text = paragraph.text.strip()
-        
-        if not text:
-            story.append(Spacer(1, 0.1*inch))
-            continue
-        
-        # Determine style based on paragraph formatting
-        if paragraph.style.name.startswith('Heading'):
-            style = styles['CustomHeading']
-        else:
-            style = styles['CustomBody']
-            
-        # Handle text alignment
-        if paragraph.alignment == 1:  # Center
-            style = ParagraphStyle('TempCenter', parent=style, alignment=TA_CENTER)
-        elif paragraph.alignment == 2:  # Right
-            style = ParagraphStyle('TempRight', parent=style, alignment=TA_RIGHT)
-        elif paragraph.alignment == 3:  # Justify
-            style = ParagraphStyle('TempJustify', parent=style, alignment=TA_JUSTIFY)
-        
-        # Add paragraph to story
+    # Method 1: Try docx2pdf (Windows with MS Word via COM)
+    if sys.platform == 'win32':
         try:
-            p = Paragraph(text, style)
-            story.append(p)
-            story.append(Spacer(1, 0.1*inch))
-        except:
-            # Fallback for special characters
-            safe_text = text.encode('ascii', 'ignore').decode('ascii')
-            p = Paragraph(safe_text, style)
-            story.append(p)
-            story.append(Spacer(1, 0.1*inch))
+            print("Trying Method 1: docx2pdf (MS Word COM)")
+            from docx2pdf import convert as docx2pdf_convert
+            
+            if pdf_path:
+                docx2pdf_convert(docx_path, pdf_path)
+                print(f"✓ Success with docx2pdf -> {pdf_path}")
+                return pdf_path
+            else:
+                # docx2pdf needs a file path, use temp file
+                with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+                    temp_pdf = tmp.name
+                docx2pdf_convert(docx_path, temp_pdf)
+                with open(temp_pdf, 'rb') as f:
+                    buffer = BytesIO(f.read())
+                os.unlink(temp_pdf)
+                print(f"✓ Success with docx2pdf -> BytesIO buffer")
+                return buffer
+        except Exception as e:
+            error_msg = f"docx2pdf failed: {str(e)}"
+            print(f"✗ {error_msg}")
+            errors.append(error_msg)
     
-    # Process tables
-    for table in doc.tables:
-        table_data = []
-        for row in table.rows:
-            row_data = []
-            for cell in row.cells:
-                cell_text = cell.text.strip()
-                row_data.append(cell_text)
-            table_data.append(row_data)
+    # Method 2: Try pypandoc (if pandoc is installed)
+    try:
+        print("Trying Method 2: pypandoc")
+        import pypandoc
         
-        if table_data:
-            # Create PDF table
-            pdf_table = Table(table_data)
-            pdf_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-            ]))
-            story.append(pdf_table)
-            story.append(Spacer(1, 0.2*inch))
+        if pdf_path:
+            pypandoc.convert_file(docx_path, 'pdf', outputfile=pdf_path)
+            print(f"✓ Success with pypandoc -> {pdf_path}")
+            return pdf_path
+        else:
+            pdf_content = pypandoc.convert_file(docx_path, 'pdf', format='docx')
+            buffer = BytesIO(pdf_content if isinstance(pdf_content, bytes) else pdf_content.encode())
+            print(f"✓ Success with pypandoc -> BytesIO buffer")
+            return buffer
+    except ImportError:
+        error_msg = "pypandoc not installed"
+        print(f"✗ {error_msg}")
+        errors.append(error_msg)
+    except Exception as e:
+        error_msg = f"pypandoc failed: {str(e)}"
+        print(f"✗ {error_msg}")
+        errors.append(error_msg)
     
-    # Build PDF
-    pdf.build(story)
+    # Method 3: Try python-docx + ReportLab (basic conversion)
+    try:
+        print("Trying Method 3: python-docx + ReportLab")
+        from docx import Document
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import inch
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib import colors
+        
+        doc = Document(docx_path)
+        
+        if pdf_path:
+            buffer = pdf_path
+        else:
+            buffer = BytesIO()
+        
+        pdf = SimpleDocTemplate(buffer, pagesize=A4, 
+                                rightMargin=50, leftMargin=50,
+                                topMargin=50, bottomMargin=30)
+        
+        story = []
+        styles = getSampleStyleSheet()
+        
+        # Add paragraphs
+        for paragraph in doc.paragraphs:
+            text = paragraph.text.strip()
+            if text:
+                try:
+                    story.append(Paragraph(text, styles['Normal']))
+                    story.append(Spacer(1, 0.1*inch))
+                except:
+                    pass
+        
+        # Add tables
+        for table in doc.tables:
+            table_data = [[cell.text.strip() for cell in row.cells] for row in table.rows]
+            if table_data:
+                try:
+                    pdf_table = Table(table_data)
+                    pdf_table.setStyle(TableStyle([
+                        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                        ('FONTSIZE', (0, 0), (-1, -1), 8),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ]))
+                    story.append(pdf_table)
+                    story.append(Spacer(1, 0.2*inch))
+                except:
+                    pass
+        
+        pdf.build(story)
+        
+        if pdf_path:
+            print(f"✓ Success with python-docx + ReportLab -> {pdf_path}")
+            return pdf_path
+        else:
+            buffer.seek(0)
+            print(f"✓ Success with python-docx + ReportLab -> BytesIO buffer")
+            return buffer
+            
+    except Exception as e:
+        error_msg = f"python-docx + ReportLab failed: {str(e)}"
+        print(f"✗ {error_msg}")
+        errors.append(error_msg)
     
-    if pdf_path:
-        return pdf_path
-    else:
-        buffer.seek(0)
-        return buffer
+    # All methods failed
+    error_summary = "\n".join(errors)
+    print(f"\n✗ All conversion methods failed:\n{error_summary}")
+    raise Exception(f"DOCX to PDF conversion failed. Tried 3 methods:\n{error_summary}")
 
 
 def docx_to_pdf_bytes(docx_path):
