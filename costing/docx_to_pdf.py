@@ -31,22 +31,29 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
     if sys.platform == 'win32':
         try:
             print("Trying Method 1: docx2pdf (MS Word COM)")
+            import pythoncom
             from docx2pdf import convert as docx2pdf_convert
             
-            if pdf_path:
-                docx2pdf_convert(docx_path, pdf_path)
-                print(f"[OK] Success with docx2pdf -> {pdf_path}")
-                return pdf_path
-            else:
-                # docx2pdf needs a file path, use temp file
-                with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
-                    temp_pdf = tmp.name
-                docx2pdf_convert(docx_path, temp_pdf)
-                with open(temp_pdf, 'rb') as f:
-                    buffer = BytesIO(f.read())
-                os.unlink(temp_pdf)
-                print(f"[OK] Success with docx2pdf -> BytesIO buffer")
-                return buffer
+            # Initialize COM for this thread (required for Django multi-threading)
+            pythoncom.CoInitialize()
+            try:
+                if pdf_path:
+                    docx2pdf_convert(docx_path, pdf_path)
+                    print(f"[OK] Success with docx2pdf -> {pdf_path}")
+                    return pdf_path
+                else:
+                    # docx2pdf needs a file path, use temp file
+                    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+                        temp_pdf = tmp.name
+                    docx2pdf_convert(docx_path, temp_pdf)
+                    with open(temp_pdf, 'rb') as f:
+                        buffer = BytesIO(f.read())
+                    os.unlink(temp_pdf)
+                    print(f"[OK] Success with docx2pdf -> BytesIO buffer")
+                    return buffer
+            finally:
+                # Always clean up COM
+                pythoncom.CoUninitialize()
         except Exception as e:
             error_msg = f"docx2pdf failed: {str(e)}"
             print(f"[X] {error_msg}")
