@@ -103,9 +103,9 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
         errors.append(error_msg)
     
     # All methods failed - PDF conversion not available
-    error_summary = "\n".join(errors)
-    print(f"\n[X] PDF conversion failed:\n{error_summary}")
-    raise Exception(f"PDF conversion not available. Please install LibreOffice on server.\n{error_summary}")
+    error_summary = " | ".join(errors)
+    print(f"\n[X] PDF conversion failed: {error_summary}")
+    raise Exception(f"PDF conversion not available - LibreOffice not installed on server")
 
 
 def docx_to_pdf_bytes(docx_path):
