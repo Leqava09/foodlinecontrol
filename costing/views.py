@@ -1509,29 +1509,21 @@ def billing_document_preview(request, pk, doc_type):
             docx_path = tmp_docx.name
             doc.save(docx_path)
 
-        # 3. Convert DOCX to PDF using LibreOffice
-        pdf_path = docx_path.replace(".docx", ".pdf")
-        
-        # LibreOffice paths to try (Linux first, then Windows for local dev)
-        libreoffice_paths = [
-            "/usr/bin/libreoffice",
-            "/usr/bin/soffice",
-            "/opt/libreoffice/program/soffice",
-            "libreoffice",
-            "soffice",
-            r"C:\Program Files\LibreOffice\program\soffice.exe",
-            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
-        ]
-        
-        libreoffice_path = None
-        for path in libreoffice_paths:
-            if os.path.exists(path):
-                libreoffice_path = path
-                break
-        
-        if not libreoffice_path:
-            # Fallback: return DOCX if LibreOffice not installed (temporary until server has LibreOffice)
-            print("LibreOffice not found - returning DOCX instead of PDF")
+        # 3. Convert DOCX to PDF using Python libraries (no LibreOffice needed)
+        try:
+            from .docx_to_pdf import docx_to_pdf_bytes
+            
+            print("Converting DOCX to PDF using Python libraries...")
+            pdf_content = docx_to_pdf_bytes(docx_path)
+            
+            # Clean up temp DOCX file
+            os.unlink(docx_path)
+            
+        except Exception as conversion_error:
+            print(f"PDF conversion error: {str(conversion_error)}")
+            print("Falling back to returning DOCX file")
+            
+            # Fallback: return DOCX if conversion fails
             with open(docx_path, 'rb') as f:
                 docx_content = f.read()
             os.unlink(docx_path)
@@ -1541,35 +1533,8 @@ def billing_document_preview(request, pk, doc_type):
             )
             response['Content-Disposition'] = f'attachment; filename="{document_type}_{header.base_number}.docx"'
             return response
-        
-        cmd = [
-            libreoffice_path,
-            "--headless",
-            "--convert-to",
-            "pdf",
-            "--outdir",
-            os.path.dirname(pdf_path),
-            docx_path,
-        ]
-        
-        result = run(cmd, capture_output=True, encoding='utf-8', errors='replace', timeout=30)
-        
-        if result.returncode != 0:
-            os.unlink(docx_path)
-            return HttpResponse(
-                f"PDF conversion failed: {result.stderr}",
-                status=500
-            )
 
-        # 4. Read PDF content
-        with open(pdf_path, "rb") as pdf_file:
-            pdf_content = pdf_file.read()
-
-        # 5. Clean up temp files
-        os.unlink(docx_path)
-        os.unlink(pdf_path)
-
-        # 6. Return PDF
+        # 4. Return PDF
         response = HttpResponse(pdf_content, content_type="application/pdf")
         response["Content-Disposition"] = (
             f'inline; filename="{document_type}_{header.base_number}.pdf"'
