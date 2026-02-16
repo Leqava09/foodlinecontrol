@@ -236,7 +236,27 @@
                 salary = parseFloat(text) || 0;
             }
 
-            const baseCost = totalInclVat + overhead + salary;
+            // Extract investor/loan from display text
+            let investorLoan = 0;
+            const investorLoanDisplay =
+                document.querySelector(
+                    '.investor_loan_price_per_unit_display .grp-readonly'
+                ) ||
+                Array.from(document.querySelectorAll('.grp-readonly')).find(
+                    (el) =>
+                        el.textContent.includes(CURRENCY) &&
+                        el.parentElement.parentElement.textContent.includes(
+                            'Investor / Loan'
+                        )
+                );
+            if (investorLoanDisplay) {
+                const text = investorLoanDisplay.textContent
+                    .replace(CURRENCY, '')
+                    .trim();
+                investorLoan = parseFloat(text) || 0;
+            }
+
+            const baseCost = totalInclVat + overhead + salary + investorLoan;
 
             let sellingPrice = baseCost;
 

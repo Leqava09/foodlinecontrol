@@ -94,6 +94,85 @@ class OverheadItem(models.Model):
     def __str__(self):
         return f"{self.item_name} ({self.item_type}) - R{self.per_month:,.2f}"
 
+class InvestorLoanCosting(models.Model):
+    site = models.ForeignKey(
+        'tenants.Site',
+        on_delete=models.CASCADE,
+        related_name='investor_loan_costings',
+        null=True,
+        blank=True,
+        help_text="Site this costing belongs to"
+    )
+    date = models.DateField(verbose_name="Date")
+    description = models.CharField(max_length=200, verbose_name="Description")
+    production_units = models.PositiveIntegerField(default=0, verbose_name="Production Units (Month)")
+    
+    is_archived = models.BooleanField(default=False, db_index=True)
+    
+    use_as_default = models.BooleanField(
+        default=False,
+        verbose_name="Use as Default",
+        help_text="Mark this record as the default investor/loan costing to use"
+    )
+    
+    @classmethod
+    def get_default(cls):
+        """Return the current default investor/loan costing, if any."""
+        return cls.objects.filter(use_as_default=True).order_by('-date').first()
+    
+    @property
+    def investment_subtotal(self):
+        return sum(item.monthly_payment for item in self.items.filter(item_type='Investment'))
+
+    @property
+    def loan_subtotal(self):
+        return sum(item.monthly_payment for item in self.items.filter(item_type='Loan'))
+
+    @property
+    def grand_total(self):
+        return self.investment_subtotal + self.loan_subtotal
+
+    @property
+    def price_per_unit(self):
+        return (self.grand_total / self.production_units) if self.production_units else Decimal('0.00')
+
+    class Meta:
+        verbose_name = "Investor / Loan Costing"
+        verbose_name_plural = "Investor / Loan Costing"
+        ordering = ['-date']
+
+    def __str__(self):
+        return self.description
+
+
+class InvestorLoanItem(models.Model):
+    TYPE_CHOICES = [('Investment', 'Investment'), ('Loan', 'Loan')]
+    header = models.ForeignKey(InvestorLoanCosting, on_delete=models.CASCADE, related_name='items')
+    item_name = models.CharField(max_length=100, verbose_name="Investor / Loan Item")
+    item_type = models.CharField(max_length=15, choices=TYPE_CHOICES, verbose_name="Type")
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Total Amount")
+    monthly_payment = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Monthly Payment")
+
+    @property
+    def per_unit(self):
+        units = self.header.production_units or 0
+        if units <= 0:
+            return Decimal('0')
+        return self.monthly_payment / units
+
+    @property
+    def percentage(self):
+        total = self.header.grand_total
+        return (self.monthly_payment / total * 100) if total > 0 else 0
+
+    class Meta:
+        verbose_name = "Investor / Loan Item"
+        verbose_name_plural = "Investor / Loan Items"
+        ordering = ['item_type', 'item_name']
+
+    def __str__(self):
+        return f"{self.item_name} ({self.item_type}) - R{self.monthly_payment:,.2f}"
+
 class SalaryCosting(models.Model):
     site = models.ForeignKey(
         'tenants.Site',
@@ -224,12 +303,19 @@ class BatchCosting(models.Model):
         null=True,
         blank=True
     )
+    investor_loan_costing = models.ForeignKey(
+        InvestorLoanCosting,
+        on_delete=models.SET_NULL,
+        verbose_name="Investor / Loan Costing",
+        null=True,
+        blank=True
+    )
     price = models.DecimalField(
         max_digits=12,
         decimal_places=2,
         default=0,
         verbose_name="Selling Price",
-        help_text="Selling Price = stock price incl VAT + overhead per unit + salary per unit + markup.",
+        help_text="Selling Price = stock price incl VAT + overhead per unit + salary per unit + investor/loan per unit + markup.",
     )
     use_markup = models.BooleanField(
         default=False,
@@ -276,6 +362,14 @@ class BatchCosting(models.Model):
         blank=True,
         verbose_name="Salary Price/Unit (Snapshot)",
         help_text="Captured salary price per unit at time of first save. Won't change if default salary is updated."
+    )
+    investor_loan_price_per_unit_snapshot = models.DecimalField(
+        max_digits=12,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        verbose_name="Investor/Loan Price/Unit (Snapshot)",
+        help_text="Captured investor/loan price per unit at time of first save. Won't change if default investor/loan is updated."
     )
     date_created = models.DateField(auto_now_add=True, verbose_name="Date Created")
     notes = models.TextField(blank=True, null=True, help_text="Additional notes about this batch costing")
@@ -347,11 +441,12 @@ class BatchCosting(models.Model):
 
     @property
     def total_cost_per_unit(self):
-        """COMPLETE cost per unit = Inventory + Overhead + Salary"""
+        """COMPLETE cost per unit = Inventory + Overhead + Salary + Investor/Loan"""
         return (
             self.cost_per_unit_inventory +
             self.overhead_price_per_unit +
-            self.salary_price_per_unit
+            self.salary_price_per_unit +
+            self.investor_loan_price_per_unit
         )
 
     @property
@@ -541,6 +636,10 @@ class BatchCosting(models.Model):
         if self.salary_price_per_unit_snapshot is None and self.salary_costing:
             self.salary_price_per_unit_snapshot = self.salary_costing.price_per_unit
         
+        # Capture investor/loan snapshot on first save or if never set
+        if self.investor_loan_price_per_unit_snapshot is None and self.investor_loan_costing:
+            self.investor_loan_price_per_unit_snapshot = self.investor_loan_costing.price_per_unit
+        
         # Handle markup calculations
         if self.use_markup and self.markup_percentage:
             self.markup_per_unit = self.total_cost_per_unit * (Decimal(str(self.markup_percentage)) / Decimal('100'))
@@ -564,6 +663,13 @@ class BatchCosting(models.Model):
         if self.salary_price_per_unit_snapshot is not None:
             return self.salary_price_per_unit_snapshot
         return self.salary_costing.price_per_unit if self.salary_costing else Decimal('0.00')
+
+    @property
+    def investor_loan_price_per_unit(self):
+        """Investor/Loan cost per unit - use snapshot if available, otherwise live value"""
+        if self.investor_loan_price_per_unit_snapshot is not None:
+            return self.investor_loan_price_per_unit_snapshot
+        return self.investor_loan_costing.price_per_unit if self.investor_loan_costing else Decimal('0.00')
 
     class Meta:
         verbose_name = "Batch Costing"
@@ -748,6 +854,13 @@ class ProductCosting(models.Model):
         null=True,
         blank=True
     )
+    investor_loan_costing = models.ForeignKey(
+        InvestorLoanCosting,
+        on_delete=models.CASCADE,
+        verbose_name="Investor / Loan Costing",
+        null=True,
+        blank=True
+    )
     use_markup = models.BooleanField(
         default=False,
         verbose_name="Use Markup %",
@@ -785,7 +898,8 @@ class ProductCosting(models.Model):
         help_text=(
             "Selling Price = Total stock items incl. VAT "
             "+ Overhead price per unit + Salary price per unit "
-            "+ Markup (percentage or fixed per unit)."
+            "+ Investor/Loan price per unit "
+            "+ Markup (% or fixed per unit)."
         ),
     )
     # Snapshot fields - preserve costing values; for ProductCosting these can be updated via confirmation popup
@@ -804,6 +918,14 @@ class ProductCosting(models.Model):
         blank=True,
         verbose_name="Salary Price/Unit (Snapshot)",
         help_text="Captured salary price per unit. Can be updated via confirmation when default changes."
+    )
+    investor_loan_price_per_unit_snapshot = models.DecimalField(
+        max_digits=12,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        verbose_name="Investor/Loan Price/Unit (Snapshot)",
+        help_text="Captured investor/loan price per unit. Can be updated via confirmation when default changes."
     )
     date = models.DateField(auto_now_add=True, verbose_name="Date Created")
     notes = models.TextField(blank=True, null=True, help_text="Additional notes about this product costing")
@@ -871,6 +993,13 @@ class ProductCosting(models.Model):
             return self.salary_price_per_unit_snapshot
         return self.salary_costing.price_per_unit if self.salary_costing else Decimal('0.00')
 
+    @property
+    def investor_loan_price_per_unit(self):
+        """Investor/Loan cost per unit - use snapshot if available, otherwise live value"""
+        if self.investor_loan_price_per_unit_snapshot is not None:
+            return self.investor_loan_price_per_unit_snapshot
+        return self.investor_loan_costing.price_per_unit if self.investor_loan_costing else Decimal('0.00')
+
     def save(self, *args, **kwargs):
         """Save ProductCosting with snapshot handling.
         
@@ -888,6 +1017,10 @@ class ProductCosting(models.Model):
         if update_snapshots or self.salary_price_per_unit_snapshot is None:
             if self.salary_costing:
                 self.salary_price_per_unit_snapshot = self.salary_costing.price_per_unit
+        
+        if update_snapshots or self.investor_loan_price_per_unit_snapshot is None:
+            if self.investor_loan_costing:
+                self.investor_loan_price_per_unit_snapshot = self.investor_loan_costing.price_per_unit
         
         super().save(*args, **kwargs)
 

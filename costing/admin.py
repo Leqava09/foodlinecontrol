@@ -23,6 +23,8 @@ from .models import (
     ProductCostingStockItem,
     BatchPriceApproval,
     BillingDocumentHeader,
+    InvestorLoanCosting,
+    InvestorLoanItem,
 )
 from transport.models import DeliverySite
 from .forms import (
@@ -30,6 +32,8 @@ from .forms import (
     OverheadItemForm,
     SalaryCostingForm,
     OverheadCostingForm,
+    InvestorLoanCostingForm,
+    InvestorLoanItemForm,
 )
 from commercial.models import CompanyDetails
 from foodlinecontrol.admin_base import ArchivableAdmin
@@ -172,6 +176,110 @@ class OverheadCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         ('Header Information', {'fields': (('date', 'description', 'production_units', 'use_as_default'),)}),
         ('Totals', {'fields': (('fixed_subtotal_display', 'variable_subtotal_display', 'grand_total_display', 'price_per_unit_display'),)}),
     )
+
+
+class InvestorLoanItemInline(admin.TabularInline):
+    model = InvestorLoanItem
+    form = InvestorLoanItemForm
+    extra = 0
+    ordering = ['item_type', 'item_name']
+    fields = [
+        'item_name', 'item_type', 'total_amount', 'monthly_payment',
+        'per_unit_display', 'percentage_column',
+    ]
+    readonly_fields = [
+        'per_unit_display',
+        'percentage_column',
+    ]
+
+    def per_unit_display(self, obj):
+        if not obj.id:
+            return "-"
+        cur = get_company_currency()
+        value = f"{cur} {float(obj.per_unit):,.4f}"
+        return format_html('<span style="float:right;">{}</span>', value)
+    per_unit_display.short_description = "Per Unit"
+
+    def percentage_column(self, obj):
+        if not obj.id:
+            return "-"
+        value = "{:.2f}%".format(float(obj.percentage))
+        return format_html('<span style="display:block; text-align:center;">{}</span>', value)
+    percentage_column.short_description = "% Total"
+
+
+@admin.register(InvestorLoanCosting)
+class InvestorLoanCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin): 
+    form = InvestorLoanCostingForm
+    inlines = [InvestorLoanItemInline]
+    search_fields = ['description']
+    
+    def get_queryset(self, request):
+        """Prefetch related items for efficient calculation of totals"""
+        qs = super().get_queryset(request)
+        return qs.prefetch_related('items')
+
+    def investment_subtotal_display(self, obj):
+        cur = get_company_currency()
+        value = float(obj.investment_subtotal) if obj.investment_subtotal else 0.0
+        formatted = f"{cur} {value:,.2f}"
+        return format_html('<span id="investor-loan-investment-total">{}</span>', formatted)
+    investment_subtotal_display.short_description = "Investment"
+
+    def loan_subtotal_display(self, obj):
+        cur = get_company_currency()
+        value = float(obj.loan_subtotal) if obj.loan_subtotal else 0.0
+        formatted = f"{cur} {value:,.2f}"
+        return format_html('<span id="investor-loan-loan-total">{}</span>', formatted)
+    loan_subtotal_display.short_description = "Loan"
+
+    def grand_total_display(self, obj):
+        cur = get_company_currency()
+        value = float(obj.grand_total) if obj.grand_total else 0.0
+        color = "darkred" if value > 100000 else "black"
+        formatted = f"{cur} {value:,.2f}"
+        return format_html('<span id="investor-loan-grand-total" style="color:{};">{}</span>', color, formatted)
+    grand_total_display.short_description = "Grand Total"
+
+    def price_per_unit_display(self, obj):
+        cur = get_company_currency()
+        value = float(obj.price_per_unit) if obj.price_per_unit else 0.0
+        formatted = f"{cur} {value:,.2f}" if value > 0 else "-"
+        return format_html('<span id="investor-loan-price-per-unit">{}</span>', formatted)
+    price_per_unit_display.short_description = "Price per Unit"
+    
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if db_field.name == 'production_units':
+            formfield.widget.attrs['style'] = 'text-align:right; padding-right:4px;'
+        return formfield
+
+    readonly_fields = [
+        'investment_subtotal_display',
+        'loan_subtotal_display',
+        'grand_total_display',
+        'price_per_unit_display'
+    ]
+    
+    list_display = [
+        'description', 
+        'date', 
+        'use_as_default', 
+        'investment_subtotal_display',
+        'loan_subtotal_display',
+        'grand_total_display', 
+        'price_per_unit_display', 
+        'production_units'
+    ]
+    list_display_links = ['description']
+    list_filter = ['date']
+    search_fields = ['description']
+    
+    fieldsets = (
+        ('Header Information', {'fields': (('date', 'description', 'production_units', 'use_as_default'),)}),
+        ('Totals', {'fields': (('investment_subtotal_display', 'loan_subtotal_display', 'grand_total_display', 'price_per_unit_display'),)}),
+    )
+
 
 class SalaryPositionInline(admin.TabularInline):
     model = SalaryPosition
@@ -381,6 +489,7 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
                 ('stock_item_price_use',),
                 ('overhead_costing', 'overhead_price_per_unit_display'),
                 ('salary_costing', 'salary_price_per_unit_display'),
+                ('investor_loan_costing', 'investor_loan_price_per_unit_display'),
                 ('use_markup', 'markup_percentage'),
                 ('use_markup_per_unit', 'markup_per_unit'),
                 ('price'),
@@ -402,6 +511,7 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         'production_date_display',
         'overhead_price_per_unit_display', 
         'salary_price_per_unit_display',
+        'investor_loan_price_per_unit_display',
         'stock_item_price_display', 
         'summary_items_display',
         'costing_summary_display',
@@ -730,6 +840,48 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         return f"{cur} {float(value):,.2f}"
     salary_price_per_unit_display.short_description = "Price per Unit"
 
+    def investor_loan_price_per_unit_display(self, obj):
+        """Display investor/loan price per unit - uses snapshot if available"""
+        if not obj:
+            return "-"
+        cur = get_company_currency()
+        # Use the model's property which handles snapshot logic
+        value = obj.investor_loan_price_per_unit
+        if value == 0 and not obj.investor_loan_costing:
+            return "-"
+        return f"{cur} {float(value):,.2f}"
+    investor_loan_price_per_unit_display.short_description = "Price per Unit"
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Filter overhead_costing, salary_costing, and investor_loan_costing by current site"""
+        current_site = getattr(request, 'current_site', None)
+        
+        if db_field.name == "overhead_costing":
+            if current_site:
+                # Site admin: show ONLY overhead costings for this site
+                kwargs["queryset"] = OverheadCosting.objects.filter(site_id=current_site.id)
+            else:
+                # HQ context: show all overhead costings
+                kwargs["queryset"] = OverheadCosting.objects.all()
+        
+        elif db_field.name == "salary_costing":
+            if current_site:
+                # Site admin: show ONLY salary costings for this site
+                kwargs["queryset"] = SalaryCosting.objects.filter(site_id=current_site.id)
+            else:
+                # HQ context: show all salary costings
+                kwargs["queryset"] = SalaryCosting.objects.all()
+        
+        elif db_field.name == "investor_loan_costing":
+            if current_site:
+                # Site admin: show ONLY investor/loan costings for this site
+                kwargs["queryset"] = InvestorLoanCosting.objects.filter(site_id=current_site.id)
+            else:
+                # HQ context: show all investor/loan costings
+                kwargs["queryset"] = InvestorLoanCosting.objects.all()
+        
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
     def stock_item_price_display(self, obj):
         if not obj:
             return "-"
@@ -745,6 +897,7 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         inv = float(obj.cost_per_unit_inventory or 0)
         oh = float(obj.overhead_price_per_unit or 0)
         sal = float(obj.salary_price_per_unit or 0)
+        il = float(obj.investor_loan_price_per_unit or 0)
         total = float(obj.total_cost_per_unit or 0)
         units = obj.total_shift_total or 0
         prod_cost = float(obj.total_production_cost or 0)
@@ -758,6 +911,8 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
                     <td style="padding: 8px; text-align: right;">{cur} {oh:,.2f}</td></tr>
                 <tr><td style="padding: 8px;"><strong>Salary Cost/Unit:</strong></td>
                     <td style="padding: 8px; text-align: right;">{cur} {sal:,.2f}</td></tr>
+                <tr><td style="padding: 8px;"><strong>Investor/Loan Cost/Unit:</strong></td>
+                    <td style="padding: 8px; text-align: right;">{cur} {il:,.2f}</td></tr>
                 <tr style="background-color: #e1bee7; font-weight: bold; font-size: 15px;"><td style="padding: 10px;"><strong>TOTAL COST/UNIT:</strong></td>
                     <td style="padding: 10px; text-align: right;">{cur} {total:,.4f}</td></tr></table>
             <hr style="border: 1px solid #ddd; margin: 15px 0;">
@@ -876,15 +1031,38 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
                             'is_approved': False,
                         }
                     )
+            
+            # For existing records, pass original costing IDs and snapshot values for JS comparison
+            extra_context['original_overhead_costing_id'] = bc.overhead_costing_id or ''
+            extra_context['original_salary_costing_id'] = bc.salary_costing_id or ''
+            extra_context['original_investor_loan_costing_id'] = bc.investor_loan_costing_id or ''
+            extra_context['overhead_snapshot'] = float(bc.overhead_price_per_unit_snapshot or 0)
+            extra_context['salary_snapshot'] = float(bc.salary_price_per_unit_snapshot or 0)
+            extra_context['investor_loan_snapshot'] = float(bc.investor_loan_price_per_unit_snapshot or 0)
         
         response = super().change_view(request, object_id, form_url, extra_context)
         
-        # Inject currency as JavaScript global variable
+        # Inject currency and original values as JavaScript global variables
         if hasattr(response, 'render'):
             response.render()
         
         currency = extra_context.get('company_currency', 'R')
-        script_tag = f'<script>window.COMPANY_CURRENCY = "{currency}";</script>'.encode('utf-8')
+        orig_overhead = extra_context.get('original_overhead_costing_id', '')
+        orig_salary = extra_context.get('original_salary_costing_id', '')
+        orig_investor_loan = extra_context.get('original_investor_loan_costing_id', '')
+        overhead_snap = extra_context.get('overhead_snapshot', 0)
+        salary_snap = extra_context.get('salary_snapshot', 0)
+        investor_loan_snap = extra_context.get('investor_loan_snapshot', 0)
+        
+        script_tag = f'''<script>
+            window.COMPANY_CURRENCY = "{currency}";
+            window.ORIGINAL_OVERHEAD_COSTING_ID = "{orig_overhead}";
+            window.ORIGINAL_SALARY_COSTING_ID = "{orig_salary}";
+            window.ORIGINAL_INVESTOR_LOAN_COSTING_ID = "{orig_investor_loan}";
+            window.OVERHEAD_SNAPSHOT = {overhead_snap};
+            window.SALARY_SNAPSHOT = {salary_snap};
+            window.INVESTOR_LOAN_SNAPSHOT = {investor_loan_snap};
+        </script>'''.encode('utf-8')
         
         if hasattr(response, 'content'):
             response.content = response.content.replace(b'</head>', script_tag + b'</head>')
@@ -895,7 +1073,7 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         """Pre-populate form initial data when adding/editing BatchCosting"""
         initial = super().get_changeform_initial_data(request)
         
-        from .models import OverheadCosting, SalaryCosting
+        from .models import OverheadCosting, SalaryCosting, InvestorLoanCosting
         
         if 'overhead_costing' not in initial or initial.get('overhead_costing') is None:
             default_oh = OverheadCosting.get_default()
@@ -906,6 +1084,11 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
             default_sal = SalaryCosting.get_default()
             if default_sal:
                 initial['salary_costing'] = default_sal.pk
+        
+        if 'investor_loan_costing' not in initial or initial.get('investor_loan_costing') is None:
+            default_il = InvestorLoanCosting.get_default()
+            if default_il:
+                initial['investor_loan_costing'] = default_il.pk
         
         return initial
 
@@ -972,6 +1155,7 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
                 ('total_stock_items_display', 'total_stock_items_incl_vat_display'),
                 ('overhead_costing', 'overhead_price_per_unit_display'),
                 ('salary_costing', 'salary_price_per_unit_display'),
+                ('investor_loan_costing', 'investor_loan_price_per_unit_display'),
                 ('use_markup', 'markup_percentage'),
                 ('use_markup_percentage', 'markup_per_unit'),
                 ('price',),
@@ -988,6 +1172,7 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         'total_stock_items_incl_vat_display',
         'overhead_price_per_unit_display',
         'salary_price_per_unit_display',
+        'investor_loan_price_per_unit_display',
         'price',
     ]
     
@@ -1020,6 +1205,14 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
             else:
                 # HQ context: show all salary costings
                 kwargs["queryset"] = SalaryCosting.objects.all()
+        
+        elif db_field.name == "investor_loan_costing":
+            if current_site:
+                # Site admin: show ONLY investor/loan costings for this site
+                kwargs["queryset"] = InvestorLoanCosting.objects.filter(site_id=current_site.id)
+            else:
+                # HQ context: show all investor/loan costings
+                kwargs["queryset"] = InvestorLoanCosting.objects.all()
         
         elif db_field.name == "category":
             from product_details.models import ProductCategory
@@ -1074,11 +1267,23 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         return f"{cur} {float(value):,.2f}"
     salary_price_per_unit_display.short_description = "Price per Unit"
 
+    def investor_loan_price_per_unit_display(self, obj):
+        """Display investor/loan price per unit - uses snapshot if available"""
+        if not obj:
+            return "-"
+        cur = get_company_currency()
+        # Use the model's property which handles snapshot logic
+        value = obj.investor_loan_price_per_unit
+        if value == 0 and not obj.investor_loan_costing:
+            return "-"
+        return f"{cur} {float(value):,.2f}"
+    investor_loan_price_per_unit_display.short_description = "Price per Unit"
+
     def get_changeform_initial_data(self, request):
         """Pre-populate form initial data with defaults for new ProductCosting records"""
         initial = super().get_changeform_initial_data(request)
         
-        from .models import OverheadCosting, SalaryCosting
+        from .models import OverheadCosting, SalaryCosting, InvestorLoanCosting
         
         # Set defaults for new records
         if 'overhead_costing' not in initial or initial.get('overhead_costing') is None:
@@ -1090,6 +1295,11 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
             default_sal = SalaryCosting.get_default()
             if default_sal:
                 initial['salary_costing'] = default_sal.pk
+        
+        if 'investor_loan_costing' not in initial or initial.get('investor_loan_costing') is None:
+            default_il = InvestorLoanCosting.get_default()
+            if default_il:
+                initial['investor_loan_costing'] = default_il.pk
         
         return initial
 
@@ -1104,8 +1314,10 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
             if obj:
                 extra_context['original_overhead_costing_id'] = obj.overhead_costing_id or ''
                 extra_context['original_salary_costing_id'] = obj.salary_costing_id or ''
+                extra_context['original_investor_loan_costing_id'] = obj.investor_loan_costing_id or ''
                 extra_context['overhead_snapshot'] = float(obj.overhead_price_per_unit_snapshot or 0)
                 extra_context['salary_snapshot'] = float(obj.salary_price_per_unit_snapshot or 0)
+                extra_context['investor_loan_snapshot'] = float(obj.investor_loan_price_per_unit_snapshot or 0)
         
         response = super().change_view(request, object_id, form_url, extra_context)
         
@@ -1116,15 +1328,19 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         currency = extra_context.get('company_currency', 'R')
         orig_overhead = extra_context.get('original_overhead_costing_id', '')
         orig_salary = extra_context.get('original_salary_costing_id', '')
+        orig_investor_loan = extra_context.get('original_investor_loan_costing_id', '')
         overhead_snap = extra_context.get('overhead_snapshot', 0)
         salary_snap = extra_context.get('salary_snapshot', 0)
+        investor_loan_snap = extra_context.get('investor_loan_snapshot', 0)
         
         script_tag = f'''<script>
             window.COMPANY_CURRENCY = "{currency}";
             window.ORIGINAL_OVERHEAD_COSTING_ID = "{orig_overhead}";
             window.ORIGINAL_SALARY_COSTING_ID = "{orig_salary}";
+            window.ORIGINAL_INVESTOR_LOAN_COSTING_ID = "{orig_investor_loan}";
             window.OVERHEAD_SNAPSHOT = {overhead_snap};
             window.SALARY_SNAPSHOT = {salary_snap};
+            window.INVESTOR_LOAN_SNAPSHOT = {investor_loan_snap};
         </script>'''.encode('utf-8')
         
         if hasattr(response, 'content'):

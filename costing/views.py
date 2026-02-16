@@ -1886,3 +1886,36 @@ def get_site_invoice_data(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+
+@staff_member_required
+@require_http_methods(["GET"])
+def get_costing_price(request, costing_type, costing_id):
+    """
+    API endpoint to fetch price_per_unit for a given costing
+    costing_type: 'overhead', 'salary', or 'investor_loan'
+    costing_id: The ID of the costing record
+    """
+    try:
+        from .models import OverheadCosting, SalaryCosting, InvestorLoanCosting
+        
+        price_per_unit = 0
+        
+        if costing_type == 'overhead':
+            costing = OverheadCosting.objects.get(pk=costing_id)
+            price_per_unit = float(costing.price_per_unit)
+        elif costing_type == 'salary':
+            costing = SalaryCosting.objects.get(pk=costing_id)
+            price_per_unit = float(costing.price_per_unit)
+        elif costing_type == 'investor_loan':
+            costing = InvestorLoanCosting.objects.get(pk=costing_id)
+            price_per_unit = float(costing.price_per_unit)
+        else:
+            return JsonResponse({'error': 'Invalid costing type'}, status=400)
+        
+        return JsonResponse({'price_per_unit': price_per_unit})
+    
+    except (OverheadCosting.DoesNotExist, SalaryCosting.DoesNotExist, InvestorLoanCosting.DoesNotExist):
+        return JsonResponse({'error': 'Costing not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+

@@ -37,4 +37,5 @@ urlpatterns = [
     path('billing/email/<int:pk>/<str:doc_type>/', email_billing_document, name='email_billing_document'),
     path('api/dates-to-batch-costings/', views.dates_to_batch_costings, name='dates_to_batch_costings'),
     path('api/get-site-invoice-data/', views.get_site_invoice_data, name='get_site_invoice_data'),
+    path('get-costing-price/<str:costing_type>/<int:costing_id>/', views.get_costing_price, name='get_costing_price'),
 ]

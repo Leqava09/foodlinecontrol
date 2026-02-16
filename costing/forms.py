@@ -4,7 +4,9 @@ from .models import (
     OverheadItem,
     SalaryCosting,
     OverheadCosting,
-    BillingDocumentHeader,  
+    BillingDocumentHeader,
+    InvestorLoanCosting,
+    InvestorLoanItem,
 )
 from commercial.models import CompanyDetails
 
@@ -203,6 +205,69 @@ class OverheadItemForm(forms.ModelForm):
             self.fields["per_unit_display"].initial = (
                 f"{cur} {float(self.instance.per_unit):,.4f}"
             )
+
+
+class InvestorLoanCostingForm(forms.ModelForm):
+    date = forms.DateField(
+        required=True,
+        input_formats=DATE_INPUTS,
+        widget=forms.DateInput(
+            format="%d-%m-%Y",
+            attrs={"class": "vDateField", "size": 10},
+        ),
+    )
+
+    class Meta:
+        model = InvestorLoanCosting
+        fields = "__all__"
+
+
+class InvestorLoanItemForm(forms.ModelForm):
+    per_unit_display = forms.CharField(
+        label="Per Unit",
+        required=False,
+        disabled=True,
+    )
+    percentage_display = forms.CharField(
+        label="% Total",
+        required=False,
+        disabled=True,
+    )
+
+    class Meta:
+        model = InvestorLoanItem
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        cur = get_company_currency()
+        numeric_align = "text-align:right; padding-right:4px;"
+
+        # Read‑only totals
+        self.fields["per_unit_display"].widget.attrs["style"] = (
+            f"width:85px; {numeric_align}"
+        )
+        self.fields["percentage_display"].widget.attrs["style"] = (
+            f"width:65px; {numeric_align}"
+        )
+
+        # Entry fields
+        for name, width in [
+            ("total_amount", "120px"),
+            ("monthly_payment", "120px"),
+        ]:
+            if name in self.fields:
+                self.fields[name].widget.attrs["style"] = (
+                    f"width:{width}; {numeric_align}"
+                )
+
+        # Populate readonly values from instance
+        if self.instance.pk:
+            self.fields["per_unit_display"].initial = (
+                f"{cur} {float(self.instance.per_unit):,.4f}"
+            )
+
 
 class ImportBillingForm(forms.ModelForm):
     """Form for importing billing from site and amending pricing"""

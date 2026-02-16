@@ -1,6 +1,6 @@
 /**
  * Batch Costing Pricing Calculation - MATCHED TO PRODUCT COSTING PATTERN
- * Formula: (stock_price × 1.15) + overhead + salary + (markup_per_unit / % markup)
+ * Formula: (stock_price × 1.15) + overhead + salary + investor/loan + (markup_per_unit / % markup)
  */
 
 (function() {
@@ -91,8 +91,9 @@
 
         const overhead = getReadOnlyValue('overhead_price_per_unit_display');
         const salary   = getReadOnlyValue('salary_price_per_unit_display');
+        const investorLoan = getReadOnlyValue('investor_loan_price_per_unit_display');
 
-        let sellingPrice = (stockPrice * 1.15) + overhead + salary;
+        let sellingPrice = (stockPrice * 1.15) + overhead + salary + investorLoan;
 
         if (useMarkupCheck && useMarkupCheck.checked) {
             const markupPerUnit  = parseFloat(markupPerUnitInput.value) || 0;
