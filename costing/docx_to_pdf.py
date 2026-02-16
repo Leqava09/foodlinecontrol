@@ -103,9 +103,61 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
         print(f"[X] {error_msg}")
         errors.append(error_msg)
     
-    # Method 3: Try pypandoc (if pandoc is installed)
+    # Method 3: Try mammoth + weasyprint (DOCX -> HTML -> PDF, good quality)
     try:
-        print("Trying Method 3: pypandoc")
+        print("Trying Method 3: mammoth + weasyprint")
+        import mammoth
+        from weasyprint import HTML, CSS
+        
+        # Convert DOCX to HTML
+        with open(docx_path, 'rb') as docx_file:
+            result = mammoth.convert_to_html(docx_file)
+            html_content = result.value
+        
+        # Add basic styling for better PDF output
+        styled_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                table {{ border-collapse: collapse; width: 100%; margin: 20px 0; }}
+                td, th {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+                th {{ background-color: #f2f2f2; }}
+                img {{ max-width: 100%; height: auto; }}
+            </style>
+        </head>
+        <body>
+            {html_content}
+        </body>
+        </html>
+        """
+        
+        # Convert HTML to PDF using weasyprint
+        if pdf_path:
+            HTML(string=styled_html).write_pdf(pdf_path)
+            print(f"[OK] Success with mammoth + weasyprint -> {pdf_path}")
+            return pdf_path
+        else:
+            buffer = BytesIO()
+            HTML(string=styled_html).write_pdf(buffer)
+            buffer.seek(0)
+            print(f"[OK] Success with mammoth + weasyprint -> BytesIO buffer")
+            return buffer
+            
+    except ImportError as ie:
+        error_msg = f"mammoth or weasyprint not installed: {str(ie)}"
+        print(f"[X] {error_msg}")
+        errors.append(error_msg)
+    except Exception as e:
+        error_msg = f"mammoth + weasyprint failed: {str(e)}"
+        print(f"[X] {error_msg}")
+        errors.append(error_msg)
+    
+    # Method 4: Try pypandoc (if pandoc is installed)
+    try:
+        print("Trying Method 4: pypandoc")
         import pypandoc
         
         if pdf_path:
@@ -126,9 +178,9 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
         print(f"[X] {error_msg}")
         errors.append(error_msg)
     
-    # Method 4: Try python-docx + ReportLab (basic conversion, fallback)
+    # Method 5: Try python-docx + ReportLab (basic conversion, fallback)
     try:
-        print("Trying Method 4: python-docx + ReportLab (basic)")
+        print("Trying Method 5: python-docx + ReportLab (basic)")
         from docx import Document
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.units import inch
@@ -194,7 +246,7 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
     # All methods failed
     error_summary = "\n".join(errors)
     print(f"\n[X] All conversion methods failed:\n{error_summary}")
-    raise Exception(f"DOCX to PDF conversion failed. Tried 4 methods:\n{error_summary}")
+    raise Exception(f"DOCX to PDF conversion failed. Tried 5 methods:\n{error_summary}")
 
 
 def docx_to_pdf_bytes(docx_path):
