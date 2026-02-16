@@ -128,8 +128,12 @@ class Batch(models.Model):
     class Meta:
         verbose_name = "Production Batch"
         verbose_name_plural = "Production Batches"
-        # Note: Unique constraint cannot be enforced at DB level due to existing duplicate data
-        # Uniqueness is enforced at application level via the clean() method
+        constraints = [
+            models.UniqueConstraint(fields=['site', 'batch_number'], name='unique_batch_number_per_site')
+        ]
+        # Note: Unique constraint defined above for Django's model state
+        # However, it cannot be enforced at DB level due to existing duplicate data
+        # Uniqueness is validated at application level via the clean() method below
 
     def clean(self):
         """Validate batch_number is unique within the same site"""
