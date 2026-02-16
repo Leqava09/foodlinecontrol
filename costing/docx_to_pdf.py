@@ -107,45 +107,49 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
     try:
         print("Trying Method 3: mammoth + weasyprint")
         import mammoth
-        from weasyprint import HTML, CSS
+        import re
+        from weasyprint import HTML
         
-        # Convert DOCX to HTML
+        # Convert DOCX to HTML with custom style map to strip fonts
         with open(docx_path, 'rb') as docx_file:
-            result = mammoth.convert_to_html(docx_file)
+            # Use mammoth with options to ignore font styling
+            result = mammoth.convert_to_html(
+                docx_file,
+                style_map="p => p:fresh"  # Strip all paragraph styling
+            )
             html_content = result.value
+            
+        # Strip all font-family and font-related inline styles from HTML
+        html_content = re.sub(r'font-family:[^;"]+;?', '', html_content)
+        html_content = re.sub(r'font:[^;"]+;?', '', html_content)
+        html_content = re.sub(r'style\s*=\s*""\s*', '', html_content)  # Remove empty style attributes
         
-        # Add basic styling for better PDF output with proper font handling
+        # Add basic styling - NO specific fonts, use generic sans-serif only
         styled_html = f"""
         <!DOCTYPE html>
         <html>
         <head>
-            <meta charset="utf-8">
+            <meta charset="UTF-8">
             <style>
                 @page {{ margin: 2cm; }}
                 * {{
-                    font-family: "DejaVu Sans", "Liberation Sans", "FreeSans", sans-serif;
+                    font-family: sans-serif !important;
                 }}
                 body {{
-                    font-family: "DejaVu Sans", "Liberation Sans", "FreeSans", sans-serif;
                     margin: 0;
                     padding: 20px;
                     font-size: 11pt;
                     line-height: 1.4;
                 }}
-                p, div, span, td, th, li {{
-                    font-family: "DejaVu Sans", "Liberation Sans", "FreeSans", sans-serif;
-                }}
                 table {{
                     border-collapse: collapse;
                     width: 100%;
                     margin: 20px 0;
-                    font-family: "DejaVu Sans", "Liberation Sans", "FreeSans", sans-serif;
                 }}
                 td, th {{
                     border: 1px solid #333;
                     padding: 8px;
                     text-align: left;
-                    font-family: "DejaVu Sans", "Liberation Sans", "FreeSans", sans-serif;
                 }}
                 th {{
                     background-color: #f2f2f2;
@@ -154,9 +158,6 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
                 img {{
                     max-width: 100%;
                     height: auto;
-                }}
-                h1, h2, h3, h4, h5, h6 {{
-                    font-family: "DejaVu Sans", "Liberation Sans", "FreeSans", sans-serif;
                 }}
             </style>
         </head>
