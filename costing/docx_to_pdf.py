@@ -35,7 +35,7 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
             
             if pdf_path:
                 docx2pdf_convert(docx_path, pdf_path)
-                print(f"✓ Success with docx2pdf -> {pdf_path}")
+                print(f"[OK] Success with docx2pdf -> {pdf_path}")
                 return pdf_path
             else:
                 # docx2pdf needs a file path, use temp file
@@ -45,11 +45,11 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
                 with open(temp_pdf, 'rb') as f:
                     buffer = BytesIO(f.read())
                 os.unlink(temp_pdf)
-                print(f"✓ Success with docx2pdf -> BytesIO buffer")
+                print(f"[OK] Success with docx2pdf -> BytesIO buffer")
                 return buffer
         except Exception as e:
             error_msg = f"docx2pdf failed: {str(e)}"
-            print(f"✗ {error_msg}")
+            print(f"[X] {error_msg}")
             errors.append(error_msg)
     
     # Method 2: Try pypandoc (if pandoc is installed)
@@ -59,20 +59,20 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
         
         if pdf_path:
             pypandoc.convert_file(docx_path, 'pdf', outputfile=pdf_path)
-            print(f"✓ Success with pypandoc -> {pdf_path}")
+            print(f"[OK] Success with pypandoc -> {pdf_path}")
             return pdf_path
         else:
             pdf_content = pypandoc.convert_file(docx_path, 'pdf', format='docx')
             buffer = BytesIO(pdf_content if isinstance(pdf_content, bytes) else pdf_content.encode())
-            print(f"✓ Success with pypandoc -> BytesIO buffer")
+            print(f"[OK] Success with pypandoc -> BytesIO buffer")
             return buffer
     except ImportError:
         error_msg = "pypandoc not installed"
-        print(f"✗ {error_msg}")
+        print(f"[X] {error_msg}")
         errors.append(error_msg)
     except Exception as e:
         error_msg = f"pypandoc failed: {str(e)}"
-        print(f"✗ {error_msg}")
+        print(f"[X] {error_msg}")
         errors.append(error_msg)
     
     # Method 3: Try python-docx + ReportLab (basic conversion)
@@ -128,21 +128,21 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
         pdf.build(story)
         
         if pdf_path:
-            print(f"✓ Success with python-docx + ReportLab -> {pdf_path}")
+            print(f"[OK] Success with python-docx + ReportLab -> {pdf_path}")
             return pdf_path
         else:
             buffer.seek(0)
-            print(f"✓ Success with python-docx + ReportLab -> BytesIO buffer")
+            print(f"[OK] Success with python-docx + ReportLab -> BytesIO buffer")
             return buffer
             
     except Exception as e:
         error_msg = f"python-docx + ReportLab failed: {str(e)}"
-        print(f"✗ {error_msg}")
+        print(f"[X] {error_msg}")
         errors.append(error_msg)
     
     # All methods failed
     error_summary = "\n".join(errors)
-    print(f"\n✗ All conversion methods failed:\n{error_summary}")
+    print(f"\n[X] All conversion methods failed:\n{error_summary}")
     raise Exception(f"DOCX to PDF conversion failed. Tried 3 methods:\n{error_summary}")
 
 

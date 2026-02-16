@@ -1528,7 +1528,7 @@ def billing_document_preview(request, pk, doc_type):
             
             pdf_content = docx_to_pdf_bytes(docx_path)
             
-            log_success = f"\n{'='*60}\n✓ PDF CONVERSION SUCCESSFUL!\nPDF size: {len(pdf_content)} bytes\n{'='*60}\n"
+            log_success = f"\n{'='*60}\n[OK] PDF CONVERSION SUCCESSFUL!\nPDF size: {len(pdf_content)} bytes\n{'='*60}\n"
             print(log_success, flush=True)
             sys.stdout.flush()
             with open('debug_pdf.log', 'a', encoding='utf-8') as f:
@@ -1542,7 +1542,7 @@ def billing_document_preview(request, pk, doc_type):
             import sys
             error_trace = traceback.format_exc()
             
-            log_error = f"\n{'='*60}\n✗ PDF CONVERSION FAILED!\nError: {str(conversion_error)}\nFull traceback:\n{error_trace}\nFalling back to DOCX...\n{'='*60}\n"
+            log_error = f"\n{'='*60}\n[X] PDF CONVERSION FAILED!\nError: {str(conversion_error)}\nFull traceback:\n{error_trace}\nFalling back to DOCX...\n{'='*60}\n"
             print(log_error, flush=True)
             sys.stdout.flush()
             with open('debug_pdf.log', 'a', encoding='utf-8') as f:
