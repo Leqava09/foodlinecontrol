@@ -1,6 +1,6 @@
 """
-DOCX to PDF Conversion Without LibreOffice
-Tries multiple methods for maximum compatibility
+DOCX to PDF Conversion
+Uses MS Word COM on Windows or LibreOffice on Linux
 """
 
 from io import BytesIO
@@ -12,7 +12,6 @@ import tempfile
 def convert_docx_to_pdf(docx_path, pdf_path=None):
     """
     Convert DOCX to PDF using best available method
-    Tries multiple approaches for compatibility
     
     Args:
         docx_path: Path to input DOCX file
@@ -27,7 +26,7 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
     
     errors = []
     
-    # Method 1: Try docx2pdf (Windows with MS Word via COM)
+    # Method 1: docx2pdf (Windows with MS Word COM)
     if sys.platform == 'win32':
         try:
             print("Trying Method 1: docx2pdf (MS Word COM)")
@@ -59,7 +58,7 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
             print(f"[X] {error_msg}")
             errors.append(error_msg)
     
-    # Method 2: Try LibreOffice (Linux, best quality conversion)
+    # Method 2: LibreOffice (Linux - best quality, requires LibreOffice installed)
     try:
         print("Trying Method 2: LibreOffice")
         import subprocess
@@ -95,7 +94,7 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
             raise Exception(f"LibreOffice conversion failed: {result.stderr}")
             
     except FileNotFoundError:
-        error_msg = "LibreOffice not found (install with: sudo apt-get install libreoffice)"
+        error_msg = "LibreOffice not found - please contact hosting provider to install"
         print(f"[X] {error_msg}")
         errors.append(error_msg)
     except Exception as e:
@@ -103,183 +102,10 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
         print(f"[X] {error_msg}")
         errors.append(error_msg)
     
-    # Method 3: Try mammoth + weasyprint (DOCX -> HTML -> PDF, good quality)
-    try:
-        print("Trying Method 3: mammoth + weasyprint")
-        import mammoth
-        import re
-        from weasyprint import HTML
-        
-        # Convert DOCX to HTML with custom style map to strip fonts
-        with open(docx_path, 'rb') as docx_file:
-            # Use mammoth with options to ignore font styling
-            result = mammoth.convert_to_html(
-                docx_file,
-                style_map="p => p:fresh"  # Strip all paragraph styling
-            )
-            html_content = result.value
-            
-        # Strip all font-family and font-related inline styles from HTML
-        html_content = re.sub(r'font-family:[^;"]+;?', '', html_content)
-        html_content = re.sub(r'font:[^;"]+;?', '', html_content)
-        html_content = re.sub(r'style\s*=\s*""\s*', '', html_content)  # Remove empty style attributes
-        
-        # Add basic styling - NO specific fonts, use generic sans-serif only
-        styled_html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                @page {{ margin: 2cm; }}
-                * {{
-                    font-family: sans-serif !important;
-                }}
-                body {{
-                    margin: 0;
-                    padding: 20px;
-                    font-size: 11pt;
-                    line-height: 1.4;
-                }}
-                table {{
-                    border-collapse: collapse;
-                    width: 100%;
-                    margin: 20px 0;
-                }}
-                td, th {{
-                    border: 1px solid #333;
-                    padding: 8px;
-                    text-align: left;
-                }}
-                th {{
-                    background-color: #f2f2f2;
-                    font-weight: bold;
-                }}
-                img {{
-                    max-width: 100%;
-                    height: auto;
-                }}
-            </style>
-        </head>
-        <body>
-            {html_content}
-        </body>
-        </html>
-        """
-        
-        # Convert HTML to PDF using weasyprint
-        if pdf_path:
-            HTML(string=styled_html).write_pdf(pdf_path)
-            print(f"[OK] Success with mammoth + weasyprint -> {pdf_path}")
-            return pdf_path
-        else:
-            buffer = BytesIO()
-            HTML(string=styled_html).write_pdf(buffer)
-            buffer.seek(0)
-            print(f"[OK] Success with mammoth + weasyprint -> BytesIO buffer")
-            return buffer
-            
-    except ImportError as ie:
-        error_msg = f"mammoth or weasyprint not installed: {str(ie)}"
-        print(f"[X] {error_msg}")
-        errors.append(error_msg)
-    except Exception as e:
-        error_msg = f"mammoth + weasyprint failed: {str(e)}"
-        print(f"[X] {error_msg}")
-        errors.append(error_msg)
-    
-    # Method 4: Try pypandoc (if pandoc is installed)
-    try:
-        print("Trying Method 4: pypandoc")
-        import pypandoc
-        
-        if pdf_path:
-            pypandoc.convert_file(docx_path, 'pdf', outputfile=pdf_path)
-            print(f"[OK] Success with pypandoc -> {pdf_path}")
-            return pdf_path
-        else:
-            pdf_content = pypandoc.convert_file(docx_path, 'pdf', format='docx')
-            buffer = BytesIO(pdf_content if isinstance(pdf_content, bytes) else pdf_content.encode())
-            print(f"[OK] Success with pypandoc -> BytesIO buffer")
-            return buffer
-    except ImportError:
-        error_msg = "pypandoc not installed"
-        print(f"[X] {error_msg}")
-        errors.append(error_msg)
-    except Exception as e:
-        error_msg = f"pypandoc failed: {str(e)}"
-        print(f"[X] {error_msg}")
-        errors.append(error_msg)
-    
-    # Method 5: Try python-docx + ReportLab (basic conversion, fallback)
-    try:
-        print("Trying Method 5: python-docx + ReportLab (basic)")
-        from docx import Document
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.units import inch
-        from reportlab.lib.styles import getSampleStyleSheet
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-        from reportlab.lib import colors
-        
-        doc = Document(docx_path)
-        
-        if pdf_path:
-            buffer = pdf_path
-        else:
-            buffer = BytesIO()
-        
-        pdf = SimpleDocTemplate(buffer, pagesize=A4, 
-                                rightMargin=50, leftMargin=50,
-                                topMargin=50, bottomMargin=30)
-        
-        story = []
-        styles = getSampleStyleSheet()
-        
-        # Add paragraphs
-        for paragraph in doc.paragraphs:
-            text = paragraph.text.strip()
-            if text:
-                try:
-                    story.append(Paragraph(text, styles['Normal']))
-                    story.append(Spacer(1, 0.1*inch))
-                except:
-                    pass
-        
-        # Add tables
-        for table in doc.tables:
-            table_data = [[cell.text.strip() for cell in row.cells] for row in table.rows]
-            if table_data:
-                try:
-                    pdf_table = Table(table_data)
-                    pdf_table.setStyle(TableStyle([
-                        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                        ('FONTSIZE', (0, 0), (-1, -1), 8),
-                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                    ]))
-                    story.append(pdf_table)
-                    story.append(Spacer(1, 0.2*inch))
-                except:
-                    pass
-        
-        pdf.build(story)
-        
-        if pdf_path:
-            print(f"[OK] Success with python-docx + ReportLab -> {pdf_path}")
-            return pdf_path
-        else:
-            buffer.seek(0)
-            print(f"[OK] Success with python-docx + ReportLab -> BytesIO buffer")
-            return buffer
-            
-    except Exception as e:
-        error_msg = f"python-docx + ReportLab failed: {str(e)}"
-        print(f"[X] {error_msg}")
-        errors.append(error_msg)
-    
-    # All methods failed
+    # All methods failed - PDF conversion not available
     error_summary = "\n".join(errors)
-    print(f"\n[X] All conversion methods failed:\n{error_summary}")
-    raise Exception(f"DOCX to PDF conversion failed. Tried 5 methods:\n{error_summary}")
+    print(f"\n[X] PDF conversion failed:\n{error_summary}")
+    raise Exception(f"PDF conversion not available. Please install LibreOffice on server.\n{error_summary}")
 
 
 def docx_to_pdf_bytes(docx_path):
