@@ -86,12 +86,23 @@
             // Grand Total = Fixed subtotal + Production subtotal
             var grandTotal = fixedSubtotal + productionSubtotal;
             
-            // Price per Unit = Grand Total / Production Units
+            // Price per Unit = Grand Total / Production Units (with bonus calculation)
             var productionUnits = parseFloat($('input[name="production_units"]').val()) || 1;
-            var pricePerUnit = productionUnits > 0 ? grandTotal / productionUnits : 0;
+            var percentageBonus = parseFloat($('input[name="percentage_bonus"]').val()) || 0;
+            var productionMonths = parseFloat($('input[name="production_months"]').val()) || 12;
+            
+            var basePrice = productionUnits > 0 ? grandTotal / productionUnits : 0;
+            var pricePerUnit = basePrice;
+            
+            // Apply bonus calculation if percentage_bonus and production_months are set
+            if (percentageBonus > 0 && productionMonths > 0) {
+                var bonusAddition = (basePrice * (percentageBonus / 100)) / productionMonths;
+                pricePerUnit = basePrice + bonusAddition;
+            }
             
             console.log('Management:', managementSalary, 'Office:', officeSalary, 'Fixed:', fixedSubtotal);
-            console.log('Production:', productionSubtotal, 'Grand:', grandTotal, 'Units:', productionUnits, 'Price/Unit:', pricePerUnit);
+            console.log('Production:', productionSubtotal, 'Grand:', grandTotal, 'Units:', productionUnits);
+            console.log('Bonus:', percentageBonus, '%, Months:', productionMonths, 'Base Price:', basePrice, 'Price/Unit:', pricePerUnit);
             
             // Update Fixed subtotal display
             var $fixedDisplay = $('#salary-fixed-total');
@@ -111,10 +122,11 @@
                 $grandDisplay.text('NAD ' + grandTotal.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
             }
             
-            // Update Price per Unit display
+            // Update Price per Unit display (value only, help text is static)
             var $priceDisplay = $('#salary-price-per-unit');
             if ($priceDisplay.length) {
-                $priceDisplay.text('NAD ' + pricePerUnit.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                var priceText = 'NAD ' + pricePerUnit.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                $priceDisplay.text(priceText);
             }
             
             // Update percentage for each position (% of Production subtotal - should add up to 100%)
@@ -134,13 +146,13 @@
         }
         
         // Watch for changes in any salary input fields (positions + header fields)
-        $(document).on('input change keyup', 'input[name*="positions-"], input[name="management_salary"], input[name="office_salary"], input[name="production_units"]', function() {
+        $(document).on('input change keyup', 'input[name*="positions-"], input[name="management_salary"], input[name="office_salary"], input[name="production_units"], input[name="percentage_bonus"], input[name="production_months"]', function() {
             console.log('=== INPUT CHANGED ===', $(this).attr('name'), $(this).val());
             var fieldName = $(this).attr('name');
             if (fieldName.indexOf('__prefix__') > -1) return;
             
-            // If it's a management/office/production_units field, just update totals
-            if (fieldName === 'management_salary' || fieldName === 'office_salary' || fieldName === 'production_units') {
+            // If it's a management/office/production_units/bonus/months field, just update totals
+            if (fieldName === 'management_salary' || fieldName === 'office_salary' || fieldName === 'production_units' || fieldName === 'percentage_bonus' || fieldName === 'production_months') {
                 calculateGrandTotals();
                 return;
             }

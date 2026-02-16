@@ -265,9 +265,15 @@ class SalaryCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
 
     def price_per_unit_display(self, obj):
         cur = get_company_currency()
+        
         value = float(obj.price_per_unit or 0)
         formatted = f"{cur} {value:,.2f}" if value > 0 else "-"
-        return format_html('<div style="text-align:center;"><span id="salary-price-per-unit">{}</span></div>', formatted)
+        
+        html = f'<div style="text-align:center;"><span id="salary-price-per-unit">{formatted}</span>'
+        html += '<br><small style="color:#666; font-style:italic;">Grand total / Units + Bonus</small>'
+        html += '</div>'
+        
+        return mark_safe(html)
     price_per_unit_display.short_description = "Price per Unit"
     def management_salary_display(self, obj):
         cur = get_company_currency()
@@ -285,6 +291,8 @@ class SalaryCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
         if db_field.name in ['management_salary', 'office_salary', 'production_units']:
             formfield.widget.attrs['style'] = 'text-align:right; padding-right:4px;'
+        elif db_field.name in ['percentage_bonus', 'production_months']:
+            formfield.widget.attrs['style'] = 'text-align:right; padding-right:4px; width:80px;'
         return formfield
         
     readonly_fields = [
@@ -315,11 +323,10 @@ class SalaryCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
             'fields': (('date', 'description', 'production_units', 'use_as_default'),)
         }),
         ('Fixed Salaries', {
-            'fields': (('management_salary', 'office_salary', 'fixed_subtotal_display'),)
+            'fields': (('management_salary', 'office_salary', 'fixed_subtotal_display', 'grand_total_display'),)
         }),
         ('Totals', {
-            'fields': (('production_subtotal_display', 'grand_total_display',
-                        'price_per_unit_display'),)
+            'fields': (('production_subtotal_display', 'percentage_bonus', 'production_months', 'price_per_unit_display'),)
         }),
     )
     

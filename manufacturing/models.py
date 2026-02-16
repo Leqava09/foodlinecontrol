@@ -87,8 +87,6 @@ class Batch(models.Model):
     )
     production_date = models.DateField(verbose_name="Production Date", null=True, blank=True) 
     a_no = models.CharField(max_length=100, blank=True, verbose_name="A-NO")
-    # ✅ CHANGED: Removed primary_key=True - batch_number is now unique per site
-    batch_number = models.CharField(max_length=150, verbose_name="Production Code")
     expiry_date = models.DateField(blank=True, null=True, verbose_name="Expiry Date", editable=False)
     category = models.ForeignKey(
         ProductCategory,
@@ -130,6 +128,8 @@ class Batch(models.Model):
     class Meta:
         verbose_name = "Production Batch"
         verbose_name_plural = "Production Batches"
+        # Note: Unique constraint cannot be enforced at DB level due to existing duplicate data
+        # Uniqueness is enforced at application level via the clean() method
 
     def clean(self):
         """Validate batch_number is unique within the same site"""

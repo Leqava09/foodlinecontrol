@@ -108,6 +108,8 @@ class SalaryCosting(models.Model):
     management_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Management")
     office_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Office")
     production_units = models.PositiveIntegerField(default=0, verbose_name="Production Units (Month)")
+    percentage_bonus = models.DecimalField(max_digits=5, decimal_places=2, default=0, verbose_name="% Bonus")
+    production_months = models.PositiveIntegerField(default=12, verbose_name="Production Months")
     is_archived = models.BooleanField(default=False, db_index=True)
     use_as_default = models.BooleanField(
         default=False,
@@ -132,7 +134,18 @@ class SalaryCosting(models.Model):
 
     @property
     def price_per_unit(self):
-        return (self.grand_total / self.production_units) if self.production_units else Decimal('0.00')
+        if not self.production_units:
+            return Decimal('0.00')
+        
+        base_price = self.grand_total / self.production_units
+        
+        # Apply bonus calculation if percentage_bonus and production_months are set
+        if self.percentage_bonus and self.production_months:
+            bonus_multiplier = self.percentage_bonus / Decimal('100')
+            bonus_addition = (base_price * bonus_multiplier) / self.production_months
+            return base_price + bonus_addition
+        
+        return base_price
 
     class Meta:
         verbose_name = "Salary Costing"
