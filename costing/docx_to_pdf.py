@@ -114,18 +114,50 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
             result = mammoth.convert_to_html(docx_file)
             html_content = result.value
         
-        # Add basic styling for better PDF output
+        # Add basic styling for better PDF output with proper font handling
         styled_html = f"""
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
             <style>
-                body {{ font-family: Arial, sans-serif; margin: 40px; }}
-                table {{ border-collapse: collapse; width: 100%; margin: 20px 0; }}
-                td, th {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-                th {{ background-color: #f2f2f2; }}
-                img {{ max-width: 100%; height: auto; }}
+                @page {{ margin: 2cm; }}
+                * {{
+                    font-family: "DejaVu Sans", "Liberation Sans", "FreeSans", sans-serif;
+                }}
+                body {{
+                    font-family: "DejaVu Sans", "Liberation Sans", "FreeSans", sans-serif;
+                    margin: 0;
+                    padding: 20px;
+                    font-size: 11pt;
+                    line-height: 1.4;
+                }}
+                p, div, span, td, th, li {{
+                    font-family: "DejaVu Sans", "Liberation Sans", "FreeSans", sans-serif;
+                }}
+                table {{
+                    border-collapse: collapse;
+                    width: 100%;
+                    margin: 20px 0;
+                    font-family: "DejaVu Sans", "Liberation Sans", "FreeSans", sans-serif;
+                }}
+                td, th {{
+                    border: 1px solid #333;
+                    padding: 8px;
+                    text-align: left;
+                    font-family: "DejaVu Sans", "Liberation Sans", "FreeSans", sans-serif;
+                }}
+                th {{
+                    background-color: #f2f2f2;
+                    font-weight: bold;
+                }}
+                img {{
+                    max-width: 100%;
+                    height: auto;
+                }}
+                h1, h2, h3, h4, h5, h6 {{
+                    font-family: "DejaVu Sans", "Liberation Sans", "FreeSans", sans-serif;
+                }}
             </style>
         </head>
         <body>
