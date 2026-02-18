@@ -550,7 +550,13 @@ class Sauce(models.Model):
         return opening + self.sauce_mixed - self.closing_balance
 
 class MeatProductionSummary(models.Model):
-    production_date = models.DateField(verbose_name="Production Date", unique=True)
+    production_date = models.DateField(verbose_name="Production Date")
+    site = models.ForeignKey(
+        'tenants.Site',
+        on_delete=models.CASCADE,
+        related_name='meat_production_summaries',
+        null=True, blank=True
+    )
     total_meat_filled = models.DecimalField(
         max_digits=10, decimal_places=2, default=0, 
         verbose_name="Total Meat Filled (kg)"
@@ -576,9 +582,16 @@ class MeatProductionSummary(models.Model):
         verbose_name = "Meat Production Summary"
         verbose_name_plural = "Meat Production Summaries"
         ordering = ['-production_date']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['production_date', 'site'],
+                name='unique_meat_summary_per_site_date'
+            )
+        ]
 
     def __str__(self):
-        return f"Meat Summary - {self.production_date.strftime('%d/%m/%Y')}"
+        site_name = self.site.name if self.site else "No Site"
+        return f"Meat Summary - {site_name} - {self.production_date.strftime('%d/%m/%Y')}"
 
 class ProductionSummaryItem(models.Model):
     """

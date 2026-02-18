@@ -1155,7 +1155,8 @@ def production_batch_detail_view(request, site_slug, production_date):
                             return redirect(f"{request.path}?tab=meat")
                         
                         meat_summary, _ = MeatProductionSummary.objects.get_or_create(
-                            production_date=batch.production_date
+                            production_date=batch.production_date,
+                            site=current_site
                         )
                         # Capture OLD values
                         old_meat = {
@@ -2188,12 +2189,22 @@ def production_batch_detail_view(request, site_slug, production_date):
 
     meat_summary_dict = {}
     # ✅ Get Meat Production Summary - always load, don't gate on containers
-    meat_summary = MeatProductionSummary.objects.filter(production_date=batch.production_date).first()
+    meat_summary = MeatProductionSummary.objects.filter(
+        production_date=batch.production_date,
+        site=current_site
+    ).first()
     if meat_summary:
         meat_summary_dict = {
             'total_meat_filled': float(meat_summary.total_meat_filled) if meat_summary.total_meat_filled else 0,
             'total_waste': float(meat_summary.total_waste) if meat_summary.total_waste else 0,
-            'filling_weight_per_pouch': float(meat_summary.filling_weight_per_pouch) if meat_summary.filling_weight_per_pouch else 0.277,  # ✅ ADD THIS
+            'filling_weight_per_pouch': float(meat_summary.filling_weight_per_pouch) if meat_summary.filling_weight_per_pouch else 0.277,
+        }
+    else:
+        # ✅ Even if no meat_summary exists yet, show default filling weight
+        meat_summary_dict = {
+            'total_meat_filled': 0,
+            'total_waste': 0,
+            'filling_weight_per_pouch': 0.277,
         }
 
     pouch_waste_dict = {}

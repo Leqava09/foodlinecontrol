@@ -912,16 +912,33 @@ class StockUsageReportAdmin(admin.ModelAdmin):
             # where expectedOutput = totalShiftQty * fillingWeightPerPouch
             loss_from_frozen_pouch = Decimal('0')
             try:
-                meat_summary = MeatProductionSummary.objects.filter(production_date=bc.production_date).first()
+                # Get the site from container or batch
+                item_site = None
+                if bc.container:
+                    item_site = bc.container.site
+                else:
+                    # For batch_ref, get the site from batch
+                    batch = Batch.objects.filter(production_date=bc.production_date, batch_number=bc.batch_ref).first()
+                    item_site = batch.site if batch else None
+                
+                meat_summary = MeatProductionSummary.objects.filter(
+                    production_date=bc.production_date,
+                    site=item_site
+                ).first()
                 if meat_summary and meat_summary.total_meat_filled:
                     filling_weight = meat_summary.filling_weight_per_pouch or Decimal('0.277')
-                    # Get total pouches from all batches for this day
-                    from manufacturing.models import Batch
-                    day_batches = Batch.objects.filter(production_date=bc.production_date)
+                    # Get total pouches from all batches for this day and site
+                    day_batches = Batch.objects.filter(production_date=bc.production_date, site=item_site)
                     total_shift_qty = sum(b.shift_total or 0 for b in day_batches)
                     expected_output = Decimal(str(total_shift_qty)) * filling_weight
-                    # Get total defrosted for the day
+                    # Get total defrosted for the day and site
                     day_containers = BatchContainer.objects.filter(production_date=bc.production_date)
+                    if item_site:
+                        # Filter by site - through container.site or batch.site
+                        day_containers = day_containers.filter(
+                            models.Q(container__site=item_site) |
+                            models.Q(batch_ref__isnull=False)  # Keep local items
+                        )
                     total_defrosted = sum((c.balance_from_prev_shift or 0) + (c.book_out_qty or 0) - (c.stock_left or 0) for c in day_containers)
                     if total_defrosted > 0:
                         loss_from_frozen_pouch = ((Decimal(str(total_defrosted)) - expected_output) / Decimal(str(total_defrosted))) * 100
