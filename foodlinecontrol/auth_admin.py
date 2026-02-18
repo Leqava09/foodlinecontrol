@@ -183,7 +183,7 @@ class CustomUserForm(forms.ModelForm):
 
 @admin.register(User)
 class CustomUserAdmin(BaseUserAdmin):
-    change_list_template = "admin/archivable_change_list.html"
+    change_list_template = "admin/auth/user/change_list_with_add_staff.html"
     form = CustomUserForm
     actions = ["archive_users", "restore_users"]
     list_filter = (UserActiveFilter, 'is_staff', 'is_superuser', 'groups')
