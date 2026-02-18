@@ -670,29 +670,12 @@ def get_available_containers_with_stock(batch, current_site=None):
     return containers_with_stock
 
 def get_available_stock_transactions_with_stock(batch, current_site=None):
-    from product_details.models import MainProductComponent
-    
-    # Get MainProductComponent stock items for THIS PRODUCT
-    main_stock_item_ids = set()
-    if batch and batch.product:
-        main_stock_item_ids = set(
-            MainProductComponent.objects.filter(
-                product=batch.product
-            ).values_list('stock_item_id', flat=True).distinct()
-        )
-    
-    # Start with base filter
+    # ✅ Show all Meat category stock transactions (do not filter by MainProductComponent)
     stock_transactions = StockTransaction.objects.filter(
         transaction_type='IN',
-        status='Available'
+        status='Available',
+        stock_item__category__name__iexact='Meat'
     )
-    
-    # Filter by MainProductComponent items if they exist, otherwise show all
-    if main_stock_item_ids:
-        stock_transactions = stock_transactions.filter(stock_item_id__in=main_stock_item_ids)
-    else:
-        # Fallback: show all Meat category if no MainProductComponents defined
-        stock_transactions = stock_transactions.filter(stock_item__category__name__iexact='Meat')
     
     if current_site:
         stock_transactions = stock_transactions.filter(site=current_site)
@@ -2125,35 +2108,19 @@ def production_batch_detail_view(request, site_slug, production_date):
             "opening_balance": float(previous_recipe.closing_balance) if previous_recipe else 0,
         }
         
-    # ✅ Get batch containers for this production date - FILTER BY SITE & PRODUCT!
-    from product_details.models import MainProductComponent
+    # ✅ Get batch containers for this production date - ALWAYS show all containers
+    batch_containers_qs = BatchContainer.objects.filter(production_date=batch.production_date)
     
-    # Get MainProductComponent stock items for THIS PRODUCT (not all site products)
-    main_stock_item_ids = set()
-    if batch and batch.product:
-        main_stock_item_ids = set(
-            MainProductComponent.objects.filter(
-                product=batch.product
-            ).values_list('stock_item_id', flat=True).distinct()
+    # Filter by site if in site context
+    if current_site:
+        batch_containers_qs = batch_containers_qs.filter(
+            Q(container__site=current_site) |  # Import containers from current site
+            Q(container__isnull=True)  # All local items (batch_ref)
         )
     
-    batch_containers_qs = BatchContainer.objects.filter(production_date=batch.production_date)
-    if current_site:
-        if main_stock_item_ids:
-            # Filter to product-specific MainProductComponent items
-            batch_containers_qs = batch_containers_qs.filter(
-                Q(container__site=current_site, container__stock_item_id__in=main_stock_item_ids) |  # Import containers matching MainProductComponents
-                Q(container__isnull=True)  # ALL local items (batch_ref)
-            )
-        else:
-            # Fallback: show all Meat category if no MainProductComponents defined
-            batch_containers_qs = batch_containers_qs.filter(
-                Q(container__site=current_site) |  # Import containers from current site
-                Q(container__isnull=True)  # All local items
-            )
     batch_containers = batch_containers_qs
     
-    # ✅ Check if current site has ANY data saved - if not, don't show other sites' data
+    # ✅ Check if current site has ANY data saved
     has_site_data = batch_containers.exists()
 
     batch_containers_data = []
@@ -2187,10 +2154,8 @@ def production_batch_detail_view(request, site_slug, production_date):
 
     
     pouch_waste = Waste.objects.filter(batch=batch).first()
-    # ✅ Get Sauce record - only if current site has saved data
-    sauce = None
-    if has_site_data:
-        sauce = Sauce.objects.filter(production_date=batch.production_date).first()
+    # ✅ Get Sauce record - always load, don't gate on containers
+    sauce = Sauce.objects.filter(production_date=batch.production_date).first()
     
 
     # ⭐ STEP 1: GET CERTIFICATION DATA
@@ -2222,10 +2187,8 @@ def production_batch_detail_view(request, site_slug, production_date):
         }
 
     meat_summary_dict = {}
-    # ✅ Get Meat Production Summary - only if current site has saved data
-    meat_summary = None
-    if has_site_data:
-        meat_summary = MeatProductionSummary.objects.filter(production_date=batch.production_date).first()
+    # ✅ Get Meat Production Summary - always load, don't gate on containers
+    meat_summary = MeatProductionSummary.objects.filter(production_date=batch.production_date).first()
     if meat_summary:
         meat_summary_dict = {
             'total_meat_filled': float(meat_summary.total_meat_filled) if meat_summary.total_meat_filled else 0,
@@ -2475,9 +2438,8 @@ def production_batch_detail_view(request, site_slug, production_date):
     # ✅ ADD RECIPE ITEM BALANCES TO BATCH DATA
     saved_recipe_items = {}  # ✅ CHANGE TO DICT
 
-    # ✅ Only show RecipeStockItemBalance if current site has saved data
-    if has_site_data:
-        for item in RecipeStockItemBalance.objects.filter(production_date=batch.production_date):
+    # ✅ Always load RecipeStockItemBalance, don't gate on containers
+    for item in RecipeStockItemBalance.objects.filter(production_date=batch.production_date):
             saved_recipe_items[str(item.stock_item.id)] = {
                 'stock_item_id': item.stock_item.id,
                 'stock_item_name': item.stock_item.name,
