@@ -74,9 +74,14 @@
         
         .sites-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
             gap: 15px;
             margin-bottom: 20px;
+            justify-items: center;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 100%;
         }
         
         .site-card {
@@ -87,6 +92,7 @@
             transition: all 0.3s ease;
             display: flex;
             flex-direction: column;
+            width: 260px;
         }
         
         .site-card:hover {
@@ -268,6 +274,14 @@
         
         .sites-grid.archived .site-card:hover {
             transform: translateY(-2px);
+        }
+        
+        .sites-grid.archived {
+            justify-items: center;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 100%;
         }
         
         .user-info {

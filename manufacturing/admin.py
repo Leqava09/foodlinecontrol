@@ -772,22 +772,34 @@ class StockUsageReportAdmin(admin.ModelAdmin):
             batch_pks = Batch.objects.filter(site_id=site_id).values_list('production_date', flat=True).distinct()
             queryset = queryset.filter(production_date__in=batch_pks)
         
-        # Get unique category names from BatchContainer records
-        category_set = set()
-        for bc in queryset:
-            if bc.container and bc.container.stock_item and bc.container.stock_item.category:
-                category_set.add(bc.container.stock_item.category.name)
-        main_categories = sorted(list(category_set))
+        # Get MainProductComponent stock items for this site (DYNAMICALLY)
+        main_product_components = MainProductComponent.objects.filter(
+            product__site_id=site_id
+        ).select_related('stock_item', 'category')
         
-        # Apply filters
+        main_stock_item_ids = set(mpc.stock_item_id for mpc in main_product_components)
+        
+        # Get unique categories from MainProductComponent items (DYNAMICALLY from actual components)
+        main_categories_set = set()
+        for mpc in main_product_components:
+            if mpc.category:
+                main_categories_set.add(mpc.category.name)
+        main_categories = sorted(list(main_categories_set))
+        
+        # DO NOT filter here - we need to check BOTH containers AND local items (batch_ref)
+        # Filter will happen in the loop for both types
+        queryset_filtered = queryset
+        
+        # Apply filters - but keep both containers and batch_ref items
         if category_filter:
-            queryset = queryset.filter(
+            # Only filter containers by category - local items filtered in loop
+            queryset_filtered = queryset_filtered.filter(
                 Q(container__stock_item__category__name__iexact=category_filter) |
-                Q(container__item_category__name__iexact=category_filter)
+                Q(batch_ref__isnull=False)  # Keep local items to check in loop
             )
         
         if container_filter:
-            queryset = queryset.filter(
+            queryset_filtered = queryset_filtered.filter(
                 Q(container__container_number__icontains=container_filter) |
                 Q(batch_ref__icontains=container_filter)
             )
@@ -796,7 +808,7 @@ class StockUsageReportAdmin(admin.ModelAdmin):
             try:
                 from datetime import datetime
                 df = datetime.strptime(date_from, '%Y-%m-%d').date()
-                queryset = queryset.filter(production_date__gte=df)
+                queryset_filtered = queryset_filtered.filter(production_date__gte=df)
             except:
                 pass
         
@@ -804,7 +816,7 @@ class StockUsageReportAdmin(admin.ModelAdmin):
             try:
                 from datetime import datetime
                 dt = datetime.strptime(date_to, '%Y-%m-%d').date()
-                queryset = queryset.filter(production_date__lte=dt)
+                queryset_filtered = queryset_filtered.filter(production_date__lte=dt)
             except:
                 pass
         
@@ -816,16 +828,23 @@ class StockUsageReportAdmin(admin.ModelAdmin):
         from inventory.models import StockTransaction
         from manufacturing.models import MeatProductionSummary
         
-        for bc in queryset:
+        for bc in queryset_filtered:
             container_num = bc.container.container_number if bc.container else bc.batch_ref
             category_name = ''
             stock_item_name = ''
+            stock_item_id = None
             book_in_qty = Decimal('0')
             total_cost = Decimal('0')
             price_per_kg = Decimal('0')
             source_type = bc.source_type or 'import'
             
             if bc.container:
+                # Imported item - check if this container's stock_item is a MainProductComponent
+                stock_item_id = bc.container.stock_item_id
+                if stock_item_id not in main_stock_item_ids:
+                    # Skip - not a MainProductComponent
+                    continue
+                
                 category_name = bc.container.stock_item.category.name if bc.container.stock_item and bc.container.stock_item.category else ''
                 stock_item_name = bc.container.stock_item.name if bc.container.stock_item else ''
                 book_in_qty = bc.container.net_weight or Decimal('0')
@@ -838,6 +857,12 @@ class StockUsageReportAdmin(admin.ModelAdmin):
                 ).select_related('category', 'stock_item').first()
                 
                 if stock_tx:
+                    stock_item_id = stock_tx.stock_item_id if stock_tx.stock_item else None
+                    # Check if this stock_item is a MainProductComponent for our site
+                    if stock_item_id not in main_stock_item_ids:
+                        # Skip this record - it's not a MainProductComponent
+                        continue
+                    
                     category_name = stock_tx.category.name if stock_tx.category else 'Local'
                     stock_item_name = stock_tx.stock_item.name if stock_tx.stock_item else (bc.batch_ref or '-')
                     # Use booking_in_total_qty (Total Amount) - this is the calculated field from kg_per_box * total_boxes
@@ -847,8 +872,8 @@ class StockUsageReportAdmin(admin.ModelAdmin):
                     transport = Decimal(str(stock_tx.transport_cost or 0))
                     total_cost = invoice + transport
                 else:
-                    category_name = 'Local'
-                    stock_item_name = bc.batch_ref or '-'
+                    # Skip - can't find stock transaction info
+                    continue
             
             # Calculate loss percentages
             book_out = bc.book_out_qty or Decimal('0')
