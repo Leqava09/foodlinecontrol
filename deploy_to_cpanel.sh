@@ -28,6 +28,16 @@ if [ $? -eq 0 ]; then
     echo "Files updated:"
     git log -1 --stat
     echo ""
+    echo "Collecting static files..."
+    cd ~/foodlinecontrol
+    python manage.py collectstatic --noinput
+    
+    if [ $? -eq 0 ]; then
+        echo "✓ Static files collected successfully!"
+    else
+        echo "⚠ Warning: Static files collection failed. Check permissions."
+    fi
+    echo ""
     echo "==================================="
     echo "Deployment Complete!"
     echo "==================================="
