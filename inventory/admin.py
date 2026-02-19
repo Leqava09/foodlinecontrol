@@ -1352,9 +1352,10 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
         return super().formfield_for_dbfield(db_field, request, **kwargs)    
 
     def get_queryset(self, request):
+        # Parent class (SiteAwareModelAdmin) handles site filtering
         qs = super().get_queryset(request)
+        # Just add ordering
         return qs.order_by('batch_ref', 'pk')
-
 
     def get_form(self, request, obj=None, **kwargs):
         batch_ref = request.GET.get('batch_ref')

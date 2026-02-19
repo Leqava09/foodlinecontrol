@@ -2250,7 +2250,11 @@ def production_batch_detail_view(request, site_slug, production_date):
     packaging_openings = get_packaging_openings(batch)
 
     # ===== STEP 5D: GET MEAT CONTAINER OPENING BALANCES ===== ✅ ADD THIS
-    meat_container_openings = get_meat_containers_opening_balance(batch, current_site)
+    # Only include meat_container_openings if there's actual saved data for this batch
+    if has_site_data:
+        meat_container_openings = get_meat_containers_opening_balance(batch, current_site)
+    else:
+        meat_container_openings = {}
 
     # ⭐ STEP 6: GET PRODUCT USAGE DATA
     product_usage_dict = {}
