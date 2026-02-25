@@ -19,9 +19,11 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=100, unique=True)),
-                ('slug', models.SlugField(help_text="URL identifier (e.g., 'windhoek')", unique=True)),
+                ('slug', models.SlugField(help_text="URL-friendly name (auto-generated from name)", unique=True, blank=True)),
                 ('description', models.TextField(blank=True, null=True)),
                 ('is_active', models.BooleanField(default=True)),
+                ('is_archived', models.BooleanField(db_index=True, default=False)),
+                ('admin_background', models.ImageField(blank=True, null=True, upload_to='sites/backgrounds/', verbose_name='Admin Background Image', help_text='Background image displayed on the admin dashboard for this site (JPEG/PNG).')),
                 ('created_on', models.DateTimeField(auto_now_add=True)),
                 ('updated_on', models.DateTimeField(auto_now=True)),
             ],
