@@ -684,13 +684,17 @@ class BatchPriceApproval(models.Model):
         BatchCosting,
         on_delete=models.CASCADE,
         related_name='price_approvals',  # Changed plural
-        verbose_name="Batch Costing"
+        verbose_name="Batch Costing",
+        null=True,
+        blank=True
     )
-    batch = models.ForeignKey(  # ← ADD THIS
+    batch = models.ForeignKey(
         Batch,
         on_delete=models.CASCADE,
         related_name='price_approval',
-        verbose_name="Batch"
+        verbose_name="Batch",
+        null=True,
+        blank=True
     )
     batch_price_per_unit = models.DecimalField(
         max_digits=12,

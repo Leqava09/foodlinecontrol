@@ -183,7 +183,9 @@ class StandardTransportRate(models.Model):
     transporter = models.ForeignKey(
         Transporter,
         on_delete=models.CASCADE,
-        related_name="standard_rates"
+        related_name="standard_rates",
+        null=True,
+        blank=True
     )
     from_location = models.CharField("From", max_length=120)
     to_location = models.CharField("To", max_length=120)
