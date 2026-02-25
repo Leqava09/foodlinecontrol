@@ -36,10 +36,14 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('is_hq_user', models.BooleanField(default=False, help_text='HQ users can access /hq/ dashboard and ALL sites')),
+                ('hq_username', models.CharField(blank=True, help_text='Unique HQ login username. Only for HQ users.', max_length=150, null=True, unique=True)),
+                ('hq_password', models.CharField(blank=True, help_text='HQ login password (encrypted with PBKDF2). Only for HQ users.', max_length=255, null=True)),
+                ('is_manager', models.BooleanField(default=False, help_text='Site Manager')),
+                ('is_archived', models.BooleanField(db_index=True, default=False)),
                 ('created_on', models.DateTimeField(auto_now_add=True)),
                 ('updated_on', models.DateTimeField(auto_now=True)),
                 ('assigned_site', models.ForeignKey(blank=True, help_text='Site this user belongs to (leave blank for HQ users)', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='assigned_users', to='tenants.site')),
-                ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='site_profile', to=settings.AUTH_USER_MODEL)),
+                ('user', models.ForeignKey(blank=True, help_text='Django user (required for site users, optional for HQ users)', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='site_profiles', to=settings.AUTH_USER_MODEL)),
             ],
             options={
                 'verbose_name': 'User Site Assignment',
