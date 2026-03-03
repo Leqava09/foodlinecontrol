@@ -828,16 +828,31 @@ from .models import StockCategory, StockSubCategory, StockTransaction
 @admin.register(StockTransaction)
 class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
     def add_view(self, request, form_url='', extra_context=None):
-        """Override add_view to inject category from query string into POST"""
+        """Override add_view to inject category from query string or batch_ref into POST"""
         category_id = request.GET.get('category')
+        transaction_type = request.GET.get('transaction_type', 'IN')
+        batch_ref = request.GET.get('batch_ref')
+        
+        # For OUT bookings without explicit category, try to get from batch_ref
+        if not category_id and transaction_type == 'OUT' and batch_ref:
+            from .models import Container, StockTransaction
+            # Try to get category from container
+            container = Container.objects.filter(container_number=batch_ref).first()
+            if container and container.stock_item and container.stock_item.category:
+                category_id = container.stock_item.category.id
+            else:
+                # Fallback to stock transaction
+                tx = StockTransaction.objects.filter(batch_ref=batch_ref).order_by('pk').first()
+                if tx and tx.stock_item and tx.stock_item.category:
+                    category_id = tx.stock_item.category.id
         
         # For both GET and POST, inject category
         if category_id:
             if request.method == 'POST' and 'category' not in request.POST:
-                # Inject into POST for form processing
+                # Inject into POST for form processing as STRING (form data must be strings)
                 try:
                     request.POST._mutable = True
-                    request.POST['category'] = category_id
+                    request.POST['category'] = str(category_id)  # Convert to string
                     request.POST._mutable = False
                 except Exception as e:
                     print(f"[Category Injection] POST mutation failed: {e}")
@@ -849,20 +864,35 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
     
     def get_form(self, request, obj=None, **kwargs):
         """Ensure instance has category before form renders"""
-        # If this is a new object (obj is None), check query string for category
-        if obj is None and request.GET.get('category'):
+        # If this is a new object (obj is None), check for category from multiple sources
+        category_id = None
+        
+        if obj is None:
+            # 1. Check GET params first
             category_id = request.GET.get('category')
-            # Create a temporary instance with the category pre-set
-            # This prevents Django from trying to access category on unsaved object
-            try:
-                from .models import StockCategory
-                category = StockCategory.objects.get(id=category_id)
-                # Create instance with category (instance won't be saved, just used for form rendering)
-                obj = StockTransaction(category=category)
-                # Store in request so form knows this was injected
-                request._injected_instance = True
-            except StockCategory.DoesNotExist:
-                pass
+            
+            # 2. Check POST data (injected by add_view)
+            if not category_id and request.method == 'POST':
+                category_id = request.POST.get('category')
+            
+            # 3. Check request fallback (set by add_view)
+            if not category_id and hasattr(request, '_category_id_fallback'):
+                category_id = request._category_id_fallback
+            
+            # Create a temporary instance with the category pre-set to avoid RelatedObjectDoesNotExist
+            if category_id:
+                try:
+                    from .models import StockCategory, StockTransaction
+                    category = StockCategory.objects.get(id=category_id)
+                    # Create instance with category_id set (not category relation, to be safe)
+                    obj = StockTransaction()
+                    obj.category_id = int(category_id)
+                    # Store in request so form knows this was injected
+                    request._injected_instance = True
+                except (StockCategory.DoesNotExist, ValueError, TypeError):
+                    # If we can't find category, just proceed without pre-setting it
+                    # The form __init__ will try to handle it
+                    pass
         
         # Pass request to form
         kwargs['request'] = request
@@ -926,40 +956,86 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
             self.request = kwargs.pop('request', None)
             self.batch_ref = kwargs.pop('batch_ref', None)
             
-            # ABSOLUTELY CRITICAL: Inject category BEFORE calling super().__init__()
-            # This works for BOTH new and existing records
-            if self.request and self.request.GET.get('category'):
-                # Check if form data (args[0]) exists and is missing category
+            # CRITICAL: Ensure instance has category_id BEFORE super().__init__()
+            # to prevent RelatedObjectDoesNotExist errors during form initialization
+            if 'instance' not in kwargs or kwargs['instance'] is None:
+                # For new objects, create instance with category_id pre-set
+                category_id = None
+                
+                # Try to get category from all sources
                 if len(args) > 0 and args[0]:
-                    data = args[0]
-                    if 'category' not in data:
-                        # Inject it
+                    # Check POST data first (args[0] is data)
+                    category_id = args[0].get('category')
+                
+                if not category_id and self.request:
+                    # Check GET params
+                    category_id = self.request.GET.get('category')
+                
+                if not category_id and self.request:
+                    # Check request attributes
+                    category_id = getattr(self.request, '_category_id_for_form', None)
+                    if not category_id:
+                        category_id = getattr(self.request, '_category_id_fallback', None)
+                
+                # Create instance with category_id set
+                if category_id:
+                    try:
+                        from .models import StockTransaction
+                        instance = StockTransaction()
+                        instance.category_id = int(category_id)
+                        kwargs['instance'] = instance
+                    except (ValueError, TypeError):
+                        pass
+            
+            # CRITICAL: Inject category into POST data BEFORE calling super().__init__()
+            # This ensures category is available when form fields are initialized
+            if len(args) > 0 and args[0]:  # args[0] is the data (POST or None)
+                data = args[0]
+                if 'category' not in data:  # Only inject if not already present
+                    # Try to get category from multiple sources
+                    category_id = None
+                    
+                    # 1. Check request GET params
+                    if self.request:
+                        category_id = self.request.GET.get('category')
+                    
+                    # 2. Check request attribute set by get_form()
+                    if not category_id and self.request and hasattr(self.request, '_category_id_for_form'):
+                        category_id = self.request._category_id_for_form
+                    
+                    # 3. Check request fallback (set by add_view)
+                    if not category_id and self.request and hasattr(self.request, '_category_id_fallback'):
+                        category_id = self.request._category_id_fallback
+                    
+                    # If we found a category, inject it into POST data as string
+                    if category_id:
                         if hasattr(data, '_mutable'):
-                            # QueryDict
+                            # QueryDict (from POST)
                             data._mutable = True
-                            data['category'] = self.request.GET.get('category')
+                            data['category'] = str(category_id)
                             data._mutable = False
                         else:
-                            # Regular dict - make a copy and replace
+                            # Regular dict - shouldn't happen but handle it
                             if not isinstance(data, dict):
                                 data = dict(data)
                             else:
                                 data = data.copy()
-                            data['category'] = self.request.GET.get('category')
+                            data['category'] = str(category_id)
                             args = (data,) + args[1:]
             
             super().__init__(*args, **kwargs)
             
-            # For new objects, set category initial from query string so form can show it
+            # For new objects, ensure category_id is set from form data if not already set
             if self.request and not self.instance.pk:
-                category_id = self.request.GET.get('category')
-                if category_id:
-                    self.fields['category'].initial = category_id
-                    # Also try to set it on the instance so Django doesn't try to access it
-                    try:
-                        self.instance.category_id = int(category_id)
-                    except (ValueError, TypeError):
-                        pass
+                # If instance doesn't have category_id yet, try to set it from form data
+                if not self.instance.category_id:
+                    category_id = self.data.get('category') if self.is_bound else self.request.GET.get('category')
+                    if category_id:
+                        try:
+                            self.instance.category_id = int(category_id)
+                            self.fields['category'].initial = category_id
+                        except (ValueError, TypeError):
+                            pass
             
             # For existing objects being edited, ensure category is populated
             # even if it wasn't in POST data (it may have come from query string injection above)
@@ -1001,7 +1077,7 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
                 
                 # Find stock_item from batch_ref
                 if self.batch_ref:
-                    from .models import Container
+                    from .models import Container, StockTransaction
                     container = Container.objects.filter(container_number=self.batch_ref).first()
                     if container and container.stock_item:
                         stock_item_pk = container.stock_item.pk
@@ -1037,6 +1113,17 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
         def clean(self):
             cleaned_data = super().clean()
             
+            transaction_type = cleaned_data.get('transaction_type')
+            # For OUT bookings without transaction_type in cleaned_data, check instance or request
+            if not transaction_type:
+                if self.instance and self.instance.pk:
+                    transaction_type = self.instance.transaction_type
+                elif self.request:
+                    # Check GET first, then session (like get_fieldsets does)
+                    transaction_type = self.request.GET.get('transaction_type')
+                    if not transaction_type:
+                        transaction_type = self.request.session.get('transaction_type')
+            
             # Ensure category is available (from form or query string)
             if not cleaned_data.get('category') and self.request:
                 category_id = self.request.GET.get('category')
@@ -1048,16 +1135,42 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
                         pass  # Will be set by save_model
             
             # For editing existing records, use instance category if not in cleaned_data
-            if not cleaned_data.get('category') and self.instance.pk and self.instance.category:
-                cleaned_data['category'] = self.instance.category
+            # Use category_id to avoid accessing relation that might not exist
+            if not cleaned_data.get('category') and self.instance and self.instance.pk and self.instance.category_id:
+                # Use category_id lookup instead of accessing relationship
+                from .models import StockCategory
+                try:
+                    cleaned_data['category'] = StockCategory.objects.get(id=self.instance.category_id)
+                except StockCategory.DoesNotExist:
+                    pass
             
-            # Category is required for NEW records, but not for edits (already set)
+            # For OUT bookings, get category from stock_item if not already set
+            # Note: stock_item is a disabled field, so we need to get it from self.data or initial
+            if not cleaned_data.get('category') and transaction_type == 'OUT':
+                stock_item_obj = cleaned_data.get('stock_item')
+                
+                # If stock_item is not in cleaned_data (disabled field), try to get from initial or data
+                if not stock_item_obj and self.is_bound:
+                    stock_item_id = self.data.get('stock_item')
+                    if stock_item_id:
+                        from .models import StockItem
+                        try:
+                            stock_item_obj = StockItem.objects.get(id=stock_item_id)
+                        except StockItem.DoesNotExist:
+                            pass
+                
+                if stock_item_obj and stock_item_obj.category:
+                    cleaned_data['category'] = stock_item_obj.category
+            
+            # Category is required for NEW records (except OUT which gets it from stock_item), but not for edits (already set)
             if not cleaned_data.get('category'):
                 if not self.instance.pk:
-                    # New record - category is required
-                    raise forms.ValidationError("Category is required")
-                # Existing record - use instance category
-                cleaned_data['category'] = self.instance.category
+                    # New record - category is required (unless it's OUT which should have gotten it from stock_item)
+                    if transaction_type == 'OUT':
+                        # For OUT bookings, skip validation error - category should come from save_model fallback
+                        pass
+                    else:
+                        raise forms.ValidationError("Category is required")
             
             transaction_type = cleaned_data.get('transaction_type')
             
@@ -1445,7 +1558,13 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
         return super().changeform_view(request, object_id, form_url, extra_context)
         
     def available_stock(self, obj):
-        category = getattr(obj.stock_item.category, "name", "").lower()
+        # Safely get category name without triggering RelatedObjectDoesNotExist
+        category = ""
+        if obj.stock_item and obj.stock_item.category_id:
+            try:
+                category = getattr(obj.stock_item.category, "name", "").lower()
+            except (AttributeError, Exception):
+                category = ""
         if category == "liver":
             total_in = Container.objects.filter(supplier__category__name__iexact='Liver').aggregate(
             sum=Sum('total_weight_container'))['sum'] or 0
@@ -1485,6 +1604,15 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         batch_ref = request.GET.get('batch_ref')
         transaction_type = request.GET.get('transaction_type', None)
+        
+        # Store category info on request so form __init__ can use it
+        if obj is None:
+            # Try to get category from all sources
+            category_id = request.GET.get('category') or request.POST.get('category')
+            if not category_id and hasattr(request, '_category_id_fallback'):
+                category_id = request._category_id_fallback
+            if category_id:
+                request._category_id_for_form = category_id
         
         base_form = super().get_form(request, obj, **kwargs)
 
@@ -1530,6 +1658,17 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
         if is_booking_out and 'transaction_date' in FormWithContext.base_fields:
             FormWithContext.base_fields['transaction_date'].label = 'Booking Out Date'
 
+        # For OUT bookings, add category as a hidden field so it can be auto-populated from batch_ref
+        if is_booking_out:
+            # Add hidden category field that won't be displayed but will accept POST data
+            from django import forms
+            from .models import StockCategory
+            FormWithContext.base_fields['category'] = forms.ModelChoiceField(
+                queryset=StockCategory.objects.all(),
+                widget=forms.HiddenInput(),
+                required=False
+            )
+
         if obj and obj.supplier_id and 'supplier' in FormWithContext.base_fields:
             FormWithContext.base_fields['supplier'].initial = obj.supplier_id
 
@@ -1540,13 +1679,28 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
             obj.stock_item = self._stock_item_to_save
             # ✅ ONLY set category from stock_item if user didn't explicitly select one
             # (i.e., if category is still None/empty). Don't override user selection.
-            if not obj.category and self._stock_item_to_save and self._stock_item_to_save.category:
-                obj.category = self._stock_item_to_save.category
+            if not obj.category_id and self._stock_item_to_save and self._stock_item_to_save.category_id:
+                obj.category_id = self._stock_item_to_save.category_id
         
         # Set transaction_type from URL for new records
         if not change:
             transaction_type = request.GET.get('transaction_type', 'IN')
             obj.transaction_type = transaction_type
+        
+        # For OUT bookings, ensure category is set from stock_item if still missing
+        if not obj.category_id and obj.stock_item and obj.stock_item.category_id:
+            obj.category_id = obj.stock_item.category_id
+        
+        # Fallback: For OUT bookings, try to get category from batch_ref if still missing
+        if not obj.category_id and obj.transaction_type == 'OUT' and obj.batch_ref:
+            from .models import Container
+            container = Container.objects.filter(container_number=obj.batch_ref).first()
+            if container and container.stock_item and container.stock_item.category_id:
+                obj.category_id = container.stock_item.category_id
+            else:
+                tx = StockTransaction.objects.filter(batch_ref=obj.batch_ref).order_by('pk').first()
+                if tx and tx.stock_item and tx.stock_item.category_id:
+                    obj.category_id = tx.stock_item.category_id
         
         # ✅ ALWAYS CALCULATE AND UPDATE QUANTITY FROM PACKAGING CONFIG
         # This runs on BOTH create AND edit
