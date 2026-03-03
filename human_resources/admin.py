@@ -285,7 +285,11 @@ class PersonAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     inlines = [InductionInline, TrainingInline, LeaveInline]
 
     class Media:
-        js = ('js/hr_view_docs.js', 'js/hr_auto_expand_inlines.js')
+        js = (
+            'js/hr_grappelli_datepicker.js',
+            'js/hr_view_docs.js',
+            'js/hr_auto_expand_inlines.js',
+        )
 
     # ---- helper methods ----
     def full_name(self, obj):

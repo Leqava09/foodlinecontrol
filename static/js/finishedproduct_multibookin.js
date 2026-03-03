@@ -28,7 +28,7 @@
             return;
         }
 
-        var batchesUrl = '/inventory/finished/get-batches/';
+        var batchesUrl = '/inventory/api/batches-for-date/';
         var readyUrl   = '/inventory/admin-api/batch-ready/';
 
         function renderTable(batches) {
@@ -128,16 +128,34 @@
                 return;
             }
 
+            // Convert date from DD-MM-YYYY or DD.MM.YYYY to YYYY-MM-DD format
+            var formattedDate = dateVal;
+            if (dateVal.includes('-') || dateVal.includes('.')) {
+                var separator = dateVal.includes('-') ? '-' : '.';
+                var parts = dateVal.split(separator);
+                if (parts.length === 3 && parts[0].length === 2) {
+                    // DD-MM-YYYY or DD.MM.YYYY format
+                    formattedDate = parts[2] + '-' + parts[1] + '-' + parts[0]; // YYYY-MM-DD
+                } else if (parts.length === 3 && parts[0].length === 4) {
+                    // Already YYYY-MM-DD format
+                    formattedDate = dateVal;
+                }
+            }
+
+            console.log('Loading batches for date:', formattedDate);
+
             $.ajax({
-                url: batchesUrl + '?production_date=' + encodeURIComponent(dateVal),
+                url: batchesUrl + '?production_date=' + encodeURIComponent(formattedDate),
                 type: 'GET',
                 dataType: 'json',
                 success: function(data) {
-
-                    renderTable(data || []);
+                    console.log('Batches response:', data);
+                    // The new API returns {batches: [...]}
+                    var batches = data.batches || [];
+                    renderTable(batches);
                 },
                 error: function(xhr, status, error) {
-
+                    console.error('Error loading batches:', error);
                     $container.html('<p>Error loading batches.</p>');
                 }
             });

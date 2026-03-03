@@ -225,6 +225,8 @@ def batch_summary_items_api(request, production_date_str):
     if not prod_date:
         return JsonResponse({'error': 'Could not determine production date'}, status=400)
     
+    print(f"🔵 batch_summary_items_api: production_date={prod_date}, site={current_site}")
+    
     # ✅ Filter Batch by production_date AND site
     batch_qs = Batch.objects.filter(production_date=prod_date)
     if current_site:
@@ -247,13 +249,20 @@ def batch_summary_items_api(request, production_date_str):
     items = []
     
     # ==================== MEAT SECTION ====================
-    # ✅ Filter BatchContainer by site (through container relationship)
+    # ✅ Filter BatchContainer by site (through container relationship OR local entries)
     batch_containers = BatchContainer.objects.filter(
         production_date=prod_date
     ).select_related('container', 'container__stock_item')
+    
     if current_site:
-        batch_containers = batch_containers.filter(container__site=current_site)
+        # Include both: entries with container in current site OR entries that are local (no container)
+        from django.db.models import Q
+        batch_containers = batch_containers.filter(
+            Q(container__site=current_site) | Q(container__isnull=True)
+        )
+    
     batch_containers = batch_containers.order_by('pk')
+    print(f"   Batch Containers found: {batch_containers.count()} (production_date={prod_date})")
     
 
     for bc in batch_containers:
@@ -309,6 +318,8 @@ def batch_summary_items_api(request, production_date_str):
             'quoted': quoted,
             'type': 'main_component',
         })
+    
+    print(f"   Meat items processed: {len([i for i in items if i['section'] == 'meat'])}")
     
     # ==================== SAUCE SECTION ====================
     # ✅ Filter RecipeStockItemBalance by site (through stock_item relationship)
@@ -751,6 +762,11 @@ def batch_summary_items_api(request, production_date_str):
     total_batch_units = float(total_pouches)  # NOT the Pouch Gravy used qty!
 
     # ==================== RETURN RESPONSE ====================
+    print(f"   ✅ Returning {len(items)} summary items to frontend")
+    for section in ['meat', 'sauce', 'packaging']:
+        count = len([i for i in items if i['section'] == section])
+        if count > 0:
+            print(f"      - {section}: {count} items")
     
     return JsonResponse({
         'items': items,
@@ -827,6 +843,7 @@ def save_batch_approvals(request):
         }, status=400)
 
 @staff_member_required
+@staff_member_required
 @require_POST
 @csrf_protect
 def update_batch_price_approval(request, pk):
@@ -835,28 +852,38 @@ def update_batch_price_approval(request, pk):
     Called from batch_price_approval_save.js
     """
     
+    print(f"🔵 update_batch_price_approval called: pk={pk}, user={request.user}")
+    
     try:
         approval = get_object_or_404(BatchPriceApproval, pk=pk)
+        print(f"   Found approval: {approval.id} for batch {approval.batch.batch_number}")
 
         price_str = request.POST.get('batch_price_per_unit', '')
+        is_approved_str = request.POST.get('is_approved', 'false')
+        
+        print(f"   Request data: price='{price_str}', approved='{is_approved_str}'")
         
         if price_str:
             price_clean = price_str.replace(',', '').strip()
             try:
                 approval.batch_price_per_unit = Decimal(price_clean)
+                print(f"   Set price to: {approval.batch_price_per_unit}")
             except Exception as e:
+                print(f"   ❌ Price parse error: {e}")
                 return JsonResponse({'ok': False, 'error': f'Invalid price: {str(e)}'}, status=400)
 
-        is_approved_str = request.POST.get('is_approved', 'false')
         approval.is_approved = is_approved_str == 'true'
+        print(f"   Set approved to: {approval.is_approved}")
 
         approval.save()
+        print(f"   ✅ Saved approval to database")
 
         # Return minimal response immediately (avoids timeout/broken pipe)
         return JsonResponse({'ok': True})
         
     except Exception as e:
         import traceback
+        print(f"   ❌ Exception: {e}")
         traceback.print_exc()
         return JsonResponse({'ok': False, 'error': str(e)}, status=400)
 

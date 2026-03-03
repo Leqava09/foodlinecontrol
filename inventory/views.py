@@ -56,6 +56,80 @@ def get_unit(request, stock_item_id):
         }, status=404)
 
 
+@require_GET
+def get_site_currency(request):
+    """Get currency from current site's company details"""
+    import sys
+    log_output = []
+    
+    try:
+        from commercial.models import CompanyDetails
+        from tenants.models import Site
+        
+        log_output.append('[get_site_currency] Starting')
+        log_output.append(f'[get_site_currency] request.user: {request.user}')
+        log_output.append(f'[get_site_currency] request.user.is_authenticated: {request.user.is_authenticated}')
+        
+        current_site = None
+        
+        # Try 1: Get site from middleware
+        current_site = getattr(request, 'current_site', None)
+        log_output.append(f'[get_site_currency] request.current_site: {current_site}')
+        
+        # Try 2: Get site from session
+        if not current_site:
+            site_id = request.session.get('current_site_id')
+            log_output.append(f'[get_site_currency] Session current_site_id: {site_id}')
+            if site_id:
+                try:
+                    current_site = Site.objects.get(pk=site_id)
+                    log_output.append(f'[get_site_currency] Found site from session: {current_site}')
+                except Site.DoesNotExist:
+                    log_output.append(f'[get_site_currency] Site not found for ID: {site_id}')
+                    pass
+        
+        # Try 3: Use Django Sites framework
+        if not current_site:
+            from django.contrib.sites.shortcuts import get_current_site
+            current_site = get_current_site(request)
+            log_output.append(f'[get_site_currency] Site from Sites framework: {current_site}')
+        
+        log_output.append(f'[get_site_currency] Final current_site: {current_site}')
+        
+        if current_site:
+            company_details = CompanyDetails.objects.filter(site=current_site).first()
+            log_output.append(f'[get_site_currency] CompanyDetails: {company_details}')
+            if company_details:
+                log_output.append(f'[get_site_currency] Currency raw: "{company_details.currency}"')
+                if company_details.currency:
+                    currency_value = company_details.currency.strip() if company_details.currency else 'NAD'
+                    log_output.append(f'[get_site_currency] Currency stripped: "{currency_value}"')
+                    # Print logs to console
+                    for log in log_output:
+                        print(log, file=sys.stderr)
+                    return JsonResponse({
+                        'currency': currency_value or 'NAD',
+                    })
+        
+        # Fallback to default currency
+        log_output.append(f'[get_site_currency] Returning default NAD')
+        for log in log_output:
+            print(log, file=sys.stderr)
+        return JsonResponse({
+            'currency': 'NAD',  # Default fallback
+        })
+    except Exception as e:
+        log_output.append(f'[get_site_currency] ERROR: {str(e)}')
+        import traceback
+        log_output.append(traceback.format_exc())
+        for log in log_output:
+            print(log, file=sys.stderr)
+        return JsonResponse({
+            'currency': 'NAD',
+            'error': str(e),
+        }, status=500)
+
+
 @staff_member_required
 @require_http_methods(["GET"])
 def get_stockitem(request, pk):
@@ -719,45 +793,7 @@ def api_stock_category_summary(request):
         'categories': summary,
     }, default=decimal_encoder)
 
-@staff_member_required
-@require_http_methods(["GET"])
-def get_finished_batches_for_date(request):
-    """
-    Return batches for a given production_date (YYYY-MM-DD) for Finished Product.
-    """
-    date_str = request.GET.get('production_date')
-    if not date_str:
-        return JsonResponse([], safe=False)
 
-    try:
-        prod_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-    except ValueError:
-        return JsonResponse([], safe=False)
-
-    qs = (
-        Batch.objects
-        .filter(production_date=prod_date)
-        .select_related("product")                # so product is fetched efficiently
-        .values(
-            "batch_number",
-            "shift_total",
-            "product__product_name",              # adjust field name to your model
-            "size",                               # if size is on Batch; otherwise product__size
-        )
-        .order_by("batch_number")
-    )
-
-    data = [
-        {
-            "id": b["batch_number"],
-            "batch_number": b["batch_number"],
-            "shift_total": b["shift_total"],
-            "product_name": b["product__product_name"] or "",
-            "size": b["size"] or "",
-        }
-        for b in qs
-    ]
-    return JsonResponse(data, safe=False)
 
 @staff_member_required
 @require_GET
@@ -922,6 +958,79 @@ def api_delivery_sites(request):
     return JsonResponse({
         'sites': sites_data
     })
+
+
+def api_batches_for_date(request):
+    """
+    Get batches for a given production date and current site.
+    Query parameters:
+        production_date (str, required): The production date in YYYY-MM-DD format
+    
+    Returns JSON with:
+        batches: [
+            {
+                id: <batch_id>,
+                number: <batch_number>,
+                batch_number: <batch_number>,
+                shift_total: <shift_total>,
+                product_name: <product_name>,
+                size: <size>,
+                site_id: <site_id>
+            },
+            ...
+        ]
+    """
+    production_date = request.GET.get('production_date')
+    
+    if not production_date:
+        return JsonResponse({'error': 'production_date parameter is required', 'batches': []}, status=400)
+    
+    # Get current site from request middleware
+    current_site = getattr(request, 'current_site', None)
+    
+    try:
+        from datetime import datetime
+        prod_date = datetime.strptime(production_date, '%Y-%m-%d').date()
+    except (ValueError, TypeError) as e:
+        return JsonResponse({
+            'error': f'Invalid date format. Use YYYY-MM-DD. Got: {production_date}',
+            'batches': []
+        }, status=400)
+    
+    from manufacturing.models import Batch
+    
+    try:
+        # Get batches for this date with product details
+        batches_qs = Batch.objects.filter(production_date=prod_date).select_related('product').order_by('batch_number')
+        
+        # Filter by site if context is available
+        if current_site:
+            batches_qs = batches_qs.filter(site=current_site)
+        
+        batches_data = [
+            {
+                'id': batch.batch_number,  # Use batch_number as ID since it's the PK
+                'number': batch.batch_number,
+                'batch_number': batch.batch_number,  # Include for older code
+                'shift_total': float(batch.shift_total) if batch.shift_total else 0,
+                'product_name': batch.product.product_name if batch.product else '',
+                'size': batch.size or '',
+                'site_id': batch.site_id if batch.site else None,
+            }
+            for batch in batches_qs
+        ]
+        
+        return JsonResponse({
+            'batches': batches_data,
+            'count': len(batches_data),
+            'date': production_date,
+            'site': current_site.name if current_site else 'All Sites'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e),
+            'batches': []
+        }, status=500)
 
 
 # =============================================================================

@@ -325,8 +325,9 @@ class ContainerAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
     
     class Media:
         js = (
-            'js/container_packaging_labels.js',
             'js/booking_live_calc.js',
+            'js/unit_autofill_stocktransaction.js',
+            'js/container_packaging_labels.js',
         )
 
         
@@ -826,8 +827,44 @@ from .models import StockCategory, StockSubCategory, StockTransaction
    
 @admin.register(StockTransaction)
 class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
+    def add_view(self, request, form_url='', extra_context=None):
+        """Override add_view to inject category from query string into POST"""
+        category_id = request.GET.get('category')
+        
+        # For both GET and POST, inject category
+        if category_id:
+            if request.method == 'POST' and 'category' not in request.POST:
+                # Inject into POST for form processing
+                try:
+                    request.POST._mutable = True
+                    request.POST['category'] = category_id
+                    request.POST._mutable = False
+                except Exception as e:
+                    print(f"[Category Injection] POST mutation failed: {e}")
+            
+            # Also store on request as backup
+            request._category_id_fallback = category_id
+        
+        return super().add_view(request, form_url, extra_context)
+    
     def get_form(self, request, obj=None, **kwargs):
-        """Pass request to form for site-based filtering"""
+        """Ensure instance has category before form renders"""
+        # If this is a new object (obj is None), check query string for category
+        if obj is None and request.GET.get('category'):
+            category_id = request.GET.get('category')
+            # Create a temporary instance with the category pre-set
+            # This prevents Django from trying to access category on unsaved object
+            try:
+                from .models import StockCategory
+                category = StockCategory.objects.get(id=category_id)
+                # Create instance with category (instance won't be saved, just used for form rendering)
+                obj = StockTransaction(category=category)
+                # Store in request so form knows this was injected
+                request._injected_instance = True
+            except StockCategory.DoesNotExist:
+                pass
+        
+        # Pass request to form
         kwargs['request'] = request
         return super().get_form(request, obj, **kwargs)
     
@@ -877,11 +914,58 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
     # Use a ModelForm to provide server-side validation that keeps users
     # on the form with a red error line when quantity exceeds available.
     class StockTransactionAdminForm(forms.ModelForm):
+        # Create category field explicitly so we control how it's rendered
+        category = forms.ModelChoiceField(
+            queryset=StockCategory.objects.all(),
+            required=False,  # Changed to False - will be validated in clean() method if needed
+            label="Item Category"
+        )
+        
         def __init__(self, *args, **kwargs):
             # Capture request and batch_ref from kwargs so validation can use them
             self.request = kwargs.pop('request', None)
             self.batch_ref = kwargs.pop('batch_ref', None)
+            
+            # ABSOLUTELY CRITICAL: Inject category BEFORE calling super().__init__()
+            # This works for BOTH new and existing records
+            if self.request and self.request.GET.get('category'):
+                # Check if form data (args[0]) exists and is missing category
+                if len(args) > 0 and args[0]:
+                    data = args[0]
+                    if 'category' not in data:
+                        # Inject it
+                        if hasattr(data, '_mutable'):
+                            # QueryDict
+                            data._mutable = True
+                            data['category'] = self.request.GET.get('category')
+                            data._mutable = False
+                        else:
+                            # Regular dict - make a copy and replace
+                            if not isinstance(data, dict):
+                                data = dict(data)
+                            else:
+                                data = data.copy()
+                            data['category'] = self.request.GET.get('category')
+                            args = (data,) + args[1:]
+            
             super().__init__(*args, **kwargs)
+            
+            # For new objects, set category initial from query string so form can show it
+            if self.request and not self.instance.pk:
+                category_id = self.request.GET.get('category')
+                if category_id:
+                    self.fields['category'].initial = category_id
+                    # Also try to set it on the instance so Django doesn't try to access it
+                    try:
+                        self.instance.category_id = int(category_id)
+                    except (ValueError, TypeError):
+                        pass
+            
+            # For existing objects being edited, ensure category is populated
+            # even if it wasn't in POST data (it may have come from query string injection above)
+            elif self.instance.pk and self.instance.category_id:
+                # Make sure the category is set on the form
+                self.fields['category'].initial = self.instance.category_id
             
             # Filter stock_item queryset by current site
             if 'stock_item' in self.fields and self.request:
@@ -901,8 +985,15 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
             
             if self.instance and self.instance.pk and self.instance.transaction_type == 'OUT':
                 is_out_booking = True
-            elif not self.instance.pk and self.batch_ref and self.request:
-                if self.request.GET.get('transaction_type') == 'OUT':
+            else:
+                # Check GET params first, then session (for NEW records)
+                transaction_type = None
+                if self.request:
+                    transaction_type = self.request.GET.get('transaction_type')
+                    if not transaction_type:
+                        transaction_type = self.request.session.get('transaction_type')
+                
+                if transaction_type == 'OUT':
                     is_out_booking = True
             
             if is_out_booking and 'stock_item' in self.fields:
@@ -939,8 +1030,35 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
                 self.fields['stock_item'].help_text = old_help_text
                 self.fields['stock_item'].required = False
 
+        def full_clean(self):
+            """Override to validate the form"""
+            super().full_clean()
+
         def clean(self):
             cleaned_data = super().clean()
+            
+            # Ensure category is available (from form or query string)
+            if not cleaned_data.get('category') and self.request:
+                category_id = self.request.GET.get('category')
+                if category_id:
+                    from .models import StockCategory
+                    try:
+                        cleaned_data['category'] = StockCategory.objects.get(id=category_id)
+                    except StockCategory.DoesNotExist:
+                        pass  # Will be set by save_model
+            
+            # For editing existing records, use instance category if not in cleaned_data
+            if not cleaned_data.get('category') and self.instance.pk and self.instance.category:
+                cleaned_data['category'] = self.instance.category
+            
+            # Category is required for NEW records, but not for edits (already set)
+            if not cleaned_data.get('category'):
+                if not self.instance.pk:
+                    # New record - category is required
+                    raise forms.ValidationError("Category is required")
+                # Existing record - use instance category
+                cleaned_data['category'] = self.instance.category
+            
             transaction_type = cleaned_data.get('transaction_type')
             
             # For OUT bookings without transaction_type in cleaned_data, check instance or request
@@ -948,7 +1066,10 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
                 if self.instance and self.instance.pk:
                     transaction_type = self.instance.transaction_type
                 elif self.request:
+                    # Check GET first, then session (like get_fieldsets does)
                     transaction_type = self.request.GET.get('transaction_type')
+                    if not transaction_type:
+                        transaction_type = self.request.session.get('transaction_type')
 
             # Get batch_ref from cleaned_data, then self.batch_ref, then instance
             batch_ref = cleaned_data.get('batch_ref') or self.batch_ref
@@ -981,10 +1102,12 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
                         f"Only one Booking In is allowed per batch."
                     )
 
-            # Only validate quantity for OUT bookings
-            if transaction_type != 'OUT':
+            # Only validate quantity for OUT bookings - but SKIP if we're EDITING an existing record
+            if transaction_type != 'OUT' or self.instance.pk:
+                # Skip validation when editing existing OUT records (they were already valid)
                 return cleaned_data
 
+            # Get the quantity being booked out for validation
             qty = cleaned_data.get('quantity')
 
             if not batch_ref or not qty:
@@ -1272,7 +1395,9 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
             )
 
     def has_add_permission(self, request):
-        transaction_type = request.GET.get('transaction_type')
+        # Allow add if transaction_type is in GET, or if user has add permission via session
+        # Default to allowing 'IN' transactions if no type specified
+        transaction_type = request.GET.get('transaction_type') or request.session.get('transaction_type', 'IN')
         return transaction_type in ('IN', 'OUT')
   
     def transaction_type_display(self, obj):
@@ -1413,7 +1538,9 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         if not change and hasattr(self, '_stock_item_to_save'):
             obj.stock_item = self._stock_item_to_save
-            if self._stock_item_to_save and self._stock_item_to_save.category:
+            # ✅ ONLY set category from stock_item if user didn't explicitly select one
+            # (i.e., if category is still None/empty). Don't override user selection.
+            if not obj.category and self._stock_item_to_save and self._stock_item_to_save.category:
                 obj.category = self._stock_item_to_save.category
         
         # Set transaction_type from URL for new records
@@ -1434,7 +1561,11 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         """Render stock transactions with batch tracker and category filtering"""
-        response = super().changelist_view(request, extra_context or {})
+        extra_context = extra_context or {}
+        # Hide the default "+ Add" button - users must use "Local Book In" or "Import Book In" buttons
+        extra_context['has_add_permission'] = False
+        
+        response = super().changelist_view(request, extra_context)
         
         # If Django returned a redirect (trying to clean up params), just let it through
         # The JavaScript will re-load with whatever URL the browser ends up at
@@ -1802,10 +1933,14 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
                     })
 
                     
-                # === SOURCE 3: BATCH CONTAINER (MEAT) === (✅ FILTERED BY SITE via container)
+                # === SOURCE 3: BATCH CONTAINER (MEAT) === (✅ FILTERED BY SITE via container or batch)
                 bc_qs_prod = BatchContainer.objects.filter(production_date=prod_date)
                 if current_site:
-                    bc_qs_prod = bc_qs_prod.filter(container__site=current_site)  # Filter through container relationship
+                    # Allow either: 1) Import containers with matching site, OR 2) Local containers (no container FK)
+                    from django.db.models import Q
+                    bc_qs_prod = bc_qs_prod.filter(
+                        Q(container__site=current_site) | Q(container__isnull=True)
+                    )
                 
                 for bc in bc_qs_prod:
                     # ✅ HANDLE BOTH IMPORT (with container FK) AND LOCAL (without container)
@@ -2046,21 +2181,29 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
 
     class Media:
         js = (
+            'js/booking_live_calc.js',
             'js/stocktransaction_form_toggle.js',
             'js/unit_autofill_stocktransaction.js', 
             'js/trigger_unit_on_load.js',
             'js/prod_batch_autofill.js',
-            'js/booking_live_calc.js',
         )
         css = {
             'all': ('css/inventory-changelist.css',)
         }
 
 class FinalProductBookInForm(forms.ModelForm):
+    date = forms.DateField(
+        required=True,
+        label="Transaction Date",
+        widget=admin_widgets.AdminDateWidget,
+        input_formats=['%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%d.%m.%Y'],
+    )
+    
     production_date = forms.DateField(
         required=True,
         label="Production Date",
         widget=admin_widgets.AdminDateWidget,
+        input_formats=['%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%d.%m.%Y'],
     )
 
     per_batch_placeholder = forms.CharField(
@@ -2105,7 +2248,19 @@ class FinalProductBookInForm(forms.ModelForm):
         # Always guard access to batch
         if "batch" in self.fields:
             self.fields["batch"].required = False
-            self.fields["batch"].queryset = Batch.objects.none()
+            # ✅ FIX: Filter batch by production_date and current site
+            current_site = getattr(self.request, 'current_site', None) if self.request else None
+            
+            # If editing existing object, show its batch + all batches for that production date
+            if getattr(self.instance, "pk", None) and self.instance.batch:
+                prod_date = self.instance.batch.production_date
+                batch_qs = Batch.objects.filter(production_date=prod_date)
+                if current_site:
+                    batch_qs = batch_qs.filter(site=current_site)
+                self.fields["batch"].queryset = batch_qs
+            else:
+                # New object - start with empty, will be populated by production_date selection
+                self.fields["batch"].queryset = Batch.objects.none()
 
         if self.request and self.request.method == "GET" and not self.instance.pk:
             get = self.request.GET
@@ -2117,9 +2272,12 @@ class FinalProductBookInForm(forms.ModelForm):
                     self.initial["batch"] = batch
                     if batch.production_date:
                         self.initial["production_date"] = batch.production_date
-                        self.fields["batch"].queryset = Batch.objects.filter(
-                            production_date=batch.production_date
-                        )
+                        # ✅ FIX: Filter batch by site when batch is passed
+                        current_site = getattr(self.request, 'current_site', None)
+                        batch_qs = Batch.objects.filter(production_date=batch.production_date)
+                        if current_site:
+                            batch_qs = batch_qs.filter(site=current_site)
+                        self.fields["batch"].queryset = batch_qs
                 except Batch.DoesNotExist:
                     pass
 
@@ -2193,7 +2351,17 @@ class FinalProductBookInForm(forms.ModelForm):
 
         return cleaned
 
+    class Media:
+        js = ('js/final_product_batch_filter.js',)
+
 class FinalProductMovementForm(forms.ModelForm):
+    date = forms.DateField(
+        required=True,
+        label="Transaction Date",
+        widget=admin_widgets.AdminDateWidget,
+        input_formats=['%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%d.%m.%Y'],
+    )
+    
     class Meta:
         model = FinishedProductTransaction
         fields = [
@@ -2808,6 +2976,7 @@ class FinalProductAdmin(SiteAwareModelAdmin, ArchivableAdmin):
                     to_warehouse=to_wh,
                     authorized_person=authorized_person,
                     notes=notes,
+                    site=getattr(request, 'current_site', None),
                 )
 
                 if batch.product:

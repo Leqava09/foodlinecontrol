@@ -123,7 +123,7 @@
             const currency = window.COMPANY_CURRENCY || 'R';
             
             // Fetch price per unit for the selected costing
-            fetch(`/admin/costing/get-costing-price/${costingType}/${costingId}/`)
+            fetch(`/costing/get-costing-price/${costingType}/${costingId}/`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.price_per_unit !== undefined) {

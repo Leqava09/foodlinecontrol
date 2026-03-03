@@ -149,7 +149,6 @@ class MainProductComponentInline(nested_admin.NestedTabularInline):
 class ProductAdmin(SiteAwareModelAdmin, ArchivableAdmin, nested_admin.NestedModelAdmin):
     list_display = ['product_name', 'category', 'component_count', 'recipe_count', 'components_data']
     list_filter = ['category']
-    search_fields = ['product_name', 'category__name']
     
     def get_queryset(self, request):
         """Filter products by current site"""

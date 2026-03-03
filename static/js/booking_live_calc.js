@@ -1,7 +1,29 @@
-/**
- * LIVE BOOKING CALCULATION
- * Updates Total Amount and Price Per Unit Display
- */
+var doPriceCalculation = null;  // Will be set inside function
+var siteCurrency = 'NAD';  // Global currency that gets fetched
+
+// Fetch site currency FIRST before initializing calculations
+function fetchSiteCurrency() {
+    console.log('[BookingCalc] Starting currency fetch...');
+    fetch('/inventory/get-currency/')
+        .then(function(r) {
+            console.log('[BookingCalc] Fetch response status:', r.status);
+            return r.json();
+        })
+        .then(function(data) {
+            console.log('[BookingCalc] Fetched data:', data);
+            siteCurrency = data.currency || 'NAD';
+            window.currentSiteCurrency = siteCurrency;
+            console.log('[BookingCalc] Site currency set to:', siteCurrency);
+            // After currency is fetched, initialize calculations
+            initBookingCalculation();
+        })
+        .catch(function(e) {
+            console.error('[BookingCalc] Error fetching site currency:', e);
+            console.error('[BookingCalc] Initializing with default currency NAD');
+            // Still initialize even if fetch fails
+            initBookingCalculation();
+        });
+}
 
 function initBookingCalculation() {
     // Get the packaging fields
@@ -16,7 +38,7 @@ function initBookingCalculation() {
     for (var i = 0; i < readonlyFields.length; i++) {
         var text = readonlyFields[i].textContent || readonlyFields[i].innerText;
         // Only match if it contains "per" or "NAD" - this ensures we get price, not unit
-        if (text && (text.includes('per') || text.includes('NAD'))) {
+        if (text && (text.includes('per') || text.includes('NAD') || text.includes('per ') || text.includes('R '))) {
             if (!priceDisplayEl) {
                 priceDisplayEl = readonlyFields[i];
             }
@@ -48,32 +70,35 @@ function initBookingCalculation() {
     }
     
     // Function to calculate price per unit display
-    function doPriceCalculation() {
+    doPriceCalculation = function() {
         if (!priceDisplayEl) return;
         
         var newPrice = '';
         var newTotalCost = '';
         
+        // Use globally stored currency or default
+        var currency = window.currentSiteCurrency || siteCurrency || 'NAD';
+        console.log('[BookingCalc::doPriceCalculation] Using currency:', currency, 'window.currentSiteCurrency:', window.currentSiteCurrency, 'siteCurrency:', siteCurrency);
+        
         // Try StockTransaction first (has booking_in_total_qty and total_invoice_amount_excl)
         var bookingTotalEl = document.getElementById('id_booking_in_total_qty');
         var invoiceEl = document.getElementById('id_total_invoice_amount_excl');
         var transportEl = document.getElementById('id_transport_cost');
-        var currencyEl = document.getElementById('id_currency');
         
         if (bookingTotalEl && invoiceEl) {
             var qty = parseFloat(bookingTotalEl.value) || 0;
             var invoice = parseFloat(invoiceEl.value) || 0;
             var transport = parseFloat(transportEl ? transportEl.value : 0) || 0;
-            var currency = currencyEl ? (currencyEl.value || 'R') : 'R';
             
-            // Calculate price per unit
+            // Calculate price per unit - NO FALLBACK, use actual unit or show placeholder
+            var unitDisplay = window.currentStockItemUnit || '---';
             if (qty > 0) {
                 var totalCost = invoice + transport;
                 var pricePerUnit = totalCost / qty;
-                newPrice = currency + ' ' + pricePerUnit.toFixed(2) + ' per Kg';
+                newPrice = currency + ' ' + pricePerUnit.toFixed(2) + ' per ' + unitDisplay;
                 newTotalCost = currency + ' ' + totalCost.toFixed(2);
             } else {
-                newPrice = currency + ' 0.00 per Kg';
+                newPrice = currency + ' 0.00 per ' + unitDisplay;
                 var totalCost = invoice + transport;
                 newTotalCost = currency + ' ' + totalCost.toFixed(2);
             }
@@ -119,14 +144,16 @@ function initBookingCalculation() {
                 // Sum all costs in NAD (same as backend total_cost_nad calculation)
                 var totalCostNad = depositNad + finalNad + transportNad + commissionNad + dutyAmount + clearingAmount;
                 
-                // Format total cost display
-                newTotalCost = 'NAD ' + totalCostNad.toFixed(2);
+                // Format total cost display using site currency
+                newTotalCost = currency + ' ' + totalCostNad.toFixed(2);
                 
+                // Use unit from stock item - NO FALLBACK, only use actual unit
+                var unitDisplay = window.currentStockItemUnit || '---';
                 if (weight > 0) {
                     var pricePerUnit = totalCostNad / weight;
-                    newPrice = 'NAD ' + pricePerUnit.toFixed(2) + ' per Kg';
+                    newPrice = currency + ' ' + pricePerUnit.toFixed(2) + ' per ' + unitDisplay;
                 } else {
-                    newPrice = 'NAD 0.00 per Kg';
+                    newPrice = currency + ' 0.00 per ' + unitDisplay;
                 }
             }
         }
@@ -163,7 +190,7 @@ function initBookingCalculation() {
                 }
             }
         }
-    }
+    };
     
     // Listen to packaging fields - trigger BOTH packaging AND price calculation
     if (kgPerBoxEl) {
@@ -253,11 +280,18 @@ function initBookingCalculation() {
 
 }
 
+// Expose trigger function globally so unit_autofill_stocktransaction.js can call it
+window.triggerPriceCalculation = function() {
+    if (typeof doPriceCalculation === 'function') {
+        doPriceCalculation();
+    }
+};
+
 // Run when document loads
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initBookingCalculation);
+    document.addEventListener('DOMContentLoaded', fetchSiteCurrency);
 } else {
-    initBookingCalculation();
+    fetchSiteCurrency();
 }
 
 // Also run after a delay for dynamic content

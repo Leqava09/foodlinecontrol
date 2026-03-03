@@ -380,23 +380,33 @@ def get_sauce_recipe_openings(batch, current_site=None):
 
     return data
 
-def get_packaging_data(batch, current_site=None):
+def get_packaging_data(batch, current_site=None, packaging_category=None):
     """
     Get packaging items - pull BOTH:
     1. Opening batch_ref from previous PackagingBalance
     2. Booked out batch_ref from StockTransaction
     If different, show both. If same, show once.
+    
+    packaging_category: The category name to filter packaging items by (e.g., 'Packing', 'Test packaging')
+    If None, defaults to 'Packing' for backwards compatibility.
     """
     from inventory.models import StockTransaction, PackagingBalance
+    
+    # Default to 'Packing' if not provided
+    if not packaging_category:
+        packaging_category = 'Packing'
     
     packaging_items = {}
     
     if not batch or not batch.product:
         return {}
     
+    # ✅ Get packaging components and filter by site
     packing_components = batch.product.components.filter(
-        stock_item__category__name__iexact='Packing'
+        stock_item__category__name__iexact=packaging_category
     )
+    if current_site:
+        packing_components = packing_components.filter(stock_item__site=current_site)
     
     
     for component in packing_components:
@@ -530,12 +540,19 @@ def get_packaging_data(batch, current_site=None):
     
     return packaging_items
 
-def get_packaging_openings(batch):
+def get_packaging_openings(batch, current_site=None, packaging_category=None):
     """
     Get packaging items opening balances from PREVIOUS production's closing_balance.
     Returns closing_balance keyed by stock_item.id (opening for today).
+    
+    packaging_category: The category name to filter packaging items by (e.g., 'Packing', 'Test packaging')
+    If None, defaults to 'Packing' for backwards compatibility.
     """
     from inventory.models import PackagingBalance
+    
+    # Default to 'Packing' if not provided
+    if not packaging_category:
+        packaging_category = 'Packing'
     
     packaging_openings = {}
     
@@ -543,9 +560,12 @@ def get_packaging_openings(batch):
     if not batch or not batch.product:
         return {}
     
+    # ✅ Get packaging components with dynamic category and site filtering
     packing_components = batch.product.components.filter(
-        stock_item__category__name__iexact='Packing'
+        stock_item__category__name__iexact=packaging_category
     )
+    if current_site:
+        packing_components = packing_components.filter(stock_item__site=current_site)
     
     
     for component in packing_components:
@@ -599,6 +619,7 @@ def filter_batch_refs_by_flag(packaging_items):
 def get_meat_containers_opening_balance(batch, current_site=None):
     """
     Get opening balance for meat containers from PREVIOUS production's Stock Left.
+    Keys by container_id (container_number or batch_ref) to match across productions.
     Returns dict: { container_id: { 'opening_balance': stock_left_value } }
     """
     meat_openings = {}
@@ -624,9 +645,16 @@ def get_meat_containers_opening_balance(batch, current_site=None):
     previous_containers = BatchContainer.objects.filter(
         production_date=previous_prod.production_date
     )
+    # ✅ ALSO filter by site to match current site's containers
+    if current_site:
+        previous_containers = previous_containers.filter(
+            Q(container__site=current_site) |  # Import containers from current site
+            Q(container__isnull=True)  # All local items (batch_ref)
+        )
     
     for bc in previous_containers:
         # Get container identifier (same way as batch_containers_data uses)
+        # This matches the key used in the current production's batch containers
         container_id = bc.container.container_number if bc.container else bc.batch_ref
         
         if container_id:
@@ -670,35 +698,46 @@ def get_available_containers_with_stock(batch, current_site=None):
     return containers_with_stock
 
 def get_available_stock_transactions_with_stock(batch, current_site=None):
-    # ✅ Show all Meat category stock transactions (do not filter by MainProductComponent)
+    """
+    Get available stock transactions for the MAIN PRODUCT COMPONENT category (dynamic).
+    This is the meat category - pulls dynamically from MainProductComponent.
+    """
+    # ✅ Get the main product component category dynamically
+    main_comp = batch.product.main_product_components.select_related('category').first() if batch.product else None
+    main_component_category = main_comp.category.name if main_comp and main_comp.category else 'Meat'
+    
+    # ✅ Show all stock transactions for this category (IN type, not yet processed)
+    # Include all statuses except Processed
     stock_transactions = StockTransaction.objects.filter(
         transaction_type='IN',
-        status='Available',
-        stock_item__category__name__iexact='Meat'
-    )
+        category__name__iexact=main_component_category
+    ).exclude(status='Processed')
     
+    # ✅ MUST filter by site
     if current_site:
         stock_transactions = stock_transactions.filter(site=current_site)
-    stock_transactions = stock_transactions.select_related('stock_item', 'supplier').order_by('batch_ref')
+    
+    stock_transactions = stock_transactions.select_related('stock_item', 'supplier', 'batch').order_by('-transaction_date')
     
     transactions_with_stock = []
     
     for trans in stock_transactions:
-        # Calculate how much has been used from this transaction already
-        total_used_result = BatchContainer.objects.filter(
-            production_date__lt=batch.production_date
-        ).aggregate(total=Sum('kg_frozen_meat_used'))
-        total_used = Decimal(str(total_used_result['total'])) if total_used_result['total'] else Decimal('0')
+        # Use batch's batch_number if available, otherwise use batch_ref, otherwise TX-{pk}
+        if trans.batch and trans.batch.batch_number:
+            ref_display = trans.batch.batch_number
+        elif trans.batch_ref:
+            ref_display = trans.batch_ref
+        else:
+            ref_display = f"TX-{trans.pk}"
         
-        # Available is quantity minus what's already used
-        available_stock = max(Decimal('0'), trans.quantity - total_used)
+        available_stock = trans.quantity
         
         transactions_with_stock.append({
-            'pk': trans.batch_ref or f"TX-{trans.pk}",
-            'batch_ref': trans.batch_ref or f"TX-{trans.pk}",
-            'reference': str(trans.batch_ref) if trans.batch_ref else f"TX-{trans.pk}",
-            'net_weight': trans.quantity,
-            'available_stock': available_stock,
+            'pk': ref_display,
+            'batch_ref': ref_display,
+            'reference': ref_display,
+            'net_weight': float(trans.quantity),
+            'available_stock': float(available_stock),
             'source_type': 'local',
         })
     
@@ -873,6 +912,23 @@ def production_batch_detail_view(request, site_slug, production_date):
     first_recipe = batch.product.recipes.select_related('recipe_category').first() if batch.product else None
     sauce_tab_name = first_recipe.recipe_category.name if first_recipe and first_recipe.recipe_category else "Sauce"
     
+    # ✅ DYNAMICALLY DETERMINE PACKAGING CATEGORY
+    # Look at ALL product components (not just main ones) to find packaging category
+    packaging_category = None
+    packaging_tab_name = "Packaging"
+    if batch.product:
+        # Get all component categories from ProductComponent relation
+        all_component_categories = batch.product.components.values_list(
+            'stock_item__category__name', flat=True
+        ).distinct()
+        
+        # Filter out the main component category and empty values
+        other_categories = [cat for cat in all_component_categories if cat and cat.lower() != main_component_category.lower()]
+        if other_categories:
+            # Use the first (and typically only) non-main category as packaging
+            packaging_category = other_categories[0]
+            packaging_tab_name = packaging_category
+    
     pouch_tab_name = "Processing"
     
     
@@ -880,6 +936,7 @@ def production_batch_detail_view(request, site_slug, production_date):
     sauce_recipe_bookouts = get_sauce_recipe_bookouts(batch, current_site)  # ✅ FIX: was sauce_bookouts
     sauce_recipe_bookouts = filter_sauce_batch_refs_by_flag(sauce_recipe_bookouts)  # ✅ NOW it exists
     sauce_openings = get_sauce_recipe_openings(batch, current_site)
+    packaging_data = get_packaging_data(batch, current_site, packaging_category)  # ✅ PASS DYNAMIC CATEGORY
     
     # ============= HANDLE POST =============
     if request.method == 'POST':
@@ -1530,7 +1587,11 @@ def production_batch_detail_view(request, site_slug, production_date):
                 # Packaging
                 elif active_tab == 'packaging':
                     
-                    all_packaging_items = {item.id: item for item in StockItem.objects.filter(category__name='Packing')}
+                    # Use dynamic packaging_category instead of hardcoded 'Packing'
+                    if packaging_category:
+                        all_packaging_items = {item.id: item for item in StockItem.objects.filter(category__name__iexact=packaging_category)}
+                    else:
+                        all_packaging_items = {item.id: item for item in StockItem.objects.filter(category__name__iexact='Packing')}
                     
                     for key, closing_balance_str in request.POST.items():
                         if not key.startswith('pkg_closing_'):
@@ -1854,7 +1915,7 @@ def production_batch_detail_view(request, site_slug, production_date):
 
                                         
                 # POUCH
-                elif active_tab == 'pouch':
+                elif active_tab == 'processing':
                     pouch_waste, _ = Waste.objects.get_or_create(
                         batch=batch,
                         defaults={'production_date': batch.production_date}
@@ -2084,7 +2145,7 @@ def production_batch_detail_view(request, site_slug, production_date):
     available_containers_list = get_available_containers_with_stock(batch, current_site)
     available_stock_transactions = get_available_stock_transactions_with_stock(batch, current_site)
     
-    complete_packaging_data = get_packaging_data(batch, current_site)
+    complete_packaging_data = get_packaging_data(batch, current_site, packaging_category)
 
     sauce_recipe_bookouts = get_sauce_recipe_bookouts(batch, current_site)
 
@@ -2121,37 +2182,73 @@ def production_batch_detail_view(request, site_slug, production_date):
     
     batch_containers = batch_containers_qs
     
-    # ✅ Check if current site has ANY data saved
-    has_site_data = batch_containers.exists()
-
+    # ✅ Get opening balances from PREVIOUS production FIRST
+    meat_openings = get_meat_containers_opening_balance(batch, current_site)
+    
     batch_containers_data = []
-    for bc in batch_containers:
-        # ✅ Handle BOTH import (with container) AND local (without container)
-        container_id = bc.container.container_number if bc.container else bc.batch_ref
-        
-        if not container_id:
-            continue
-        
-        
-        batch_containers_data.append({
-            'container_id': container_id,
-            'kg_used': float(bc.kg_frozen_meat_used) if bc.kg_frozen_meat_used is not None else 0,
-            'book_out_qty': float(bc.book_out_qty) if bc.book_out_qty is not None else 0,
-            'stock_left': float(bc.stock_left) if bc.stock_left is not None else 0,
-            'filled': float(bc.meat_filled) if bc.meat_filled is not None else 0,
-            'waste': float(bc.container_waste) if bc.container_waste is not None else 0,
-            'waste_factor': float(bc.waste_factor) if bc.waste_factor is not None else 0,
-            'source_type': getattr(bc, 'source_type', 'import'),
-            # ✅ NEW: Include defrost documents for this container
-            'defrost_documents': [
-                {
-                    'id': d.id,
-                    'filename': d.file.name.split('/')[-1],
-                    'url': d.file.url,
-                }
-                for d in bc.defrost_documents.all()
-            ],
-        })
+    
+    # Find the previous production batch to get date range for booking outs
+    previous_batch = Batch.objects.filter(
+        production_date__lt=batch.production_date,
+        site=batch.site
+    ).order_by('-production_date').first()
+    
+    # Get booking out transactions BETWEEN previous batch and current batch
+    if previous_batch:
+        # Get OUT transactions after previous batch date and before current batch date
+        between_out_transactions = StockTransaction.objects.filter(
+            transaction_date__gt=previous_batch.production_date,
+            transaction_date__lt=batch.production_date,
+            transaction_type='OUT'
+        ).values('batch_ref').annotate(total_qty=Sum('quantity'))
+    else:
+        # First batch: get all OUT transactions before this batch date
+        between_out_transactions = StockTransaction.objects.filter(
+            transaction_date__lt=batch.production_date,
+            transaction_type='OUT'
+        ).values('batch_ref').annotate(total_qty=Sum('quantity'))
+    
+    # Convert to dict for quick lookup: {batch_ref: total_qty}
+    between_out_qty_map = {
+        tx['batch_ref']: abs(float(tx['total_qty'])) if tx['total_qty'] else 0 
+        for tx in between_out_transactions
+    }
+    
+
+    
+    # Step 1: Add containers from saved BatchContainer records
+    # For each container, get its book_out_qty from between-batch OUT transactions
+    if batch_containers.exists():
+        for bc in batch_containers:
+            container_id = bc.container.container_number if bc.container else bc.batch_ref
+            if not container_id:
+                continue
+            
+            opening_balance = meat_openings.get(container_id, {}).get('opening_balance', 0)
+            
+            # Get book_out_qty from OUT transactions between batches
+            between_book_out_qty = between_out_qty_map.get(container_id, 0)
+            
+            batch_containers_data.append({
+                'container_id': container_id,
+                'opening_balance': opening_balance,
+                'book_out_qty': between_book_out_qty,  # Only booking outs between batches
+                'kg_used': 0,
+                'stock_left': float(bc.stock_left) if bc.stock_left is not None else 0,
+                'filled': float(bc.meat_filled) if bc.meat_filled is not None else 0,
+                'waste': float(bc.container_waste) if bc.container_waste is not None else 0,
+                'waste_factor': float(bc.waste_factor) if bc.waste_factor is not None else 0,
+                'source_type': getattr(bc, 'source_type', 'import'),
+                'defrost_documents': [
+                    {
+                        'id': d.id,
+                        'filename': d.file.name.split('/')[-1],
+                        'url': d.file.url,
+                    }
+                    for d in bc.defrost_documents.all()
+                ],
+            })
+    
 
     
     pouch_waste = Waste.objects.filter(batch=batch).first()
@@ -2244,17 +2341,14 @@ def production_batch_detail_view(request, site_slug, production_date):
         }
 
     # ===== STEP 5B: GET COMPLETE PACKAGING DATA (FOR RENDERING) =====
-    complete_packaging_data = get_packaging_data(batch, current_site)
+    complete_packaging_data = get_packaging_data(batch, current_site, packaging_category)
     
     # ===== STEP 5C: GET PACKAGING OPENINGS (PREVIOUS CLOSING BALANCES) =====
-    packaging_openings = get_packaging_openings(batch)
+    packaging_openings = get_packaging_openings(batch, current_site, packaging_category)
 
-    # ===== STEP 5D: GET MEAT CONTAINER OPENING BALANCES ===== ✅ ADD THIS
-    # Only include meat_container_openings if there's actual saved data for this batch
-    if has_site_data:
-        meat_container_openings = get_meat_containers_opening_balance(batch, current_site)
-    else:
-        meat_container_openings = {}
+    # ===== STEP 5D: GET MEAT CONTAINER OPENING BALANCES =====
+    # Always include opening balances (from previous production)
+    meat_container_openings = meat_openings
 
     # ⭐ STEP 6: GET PRODUCT USAGE DATA
     product_usage_dict = {}
@@ -2276,6 +2370,7 @@ def production_batch_detail_view(request, site_slug, production_date):
         'requires_certification': bool(requires_nsi_nrcs_certification),
         'main_component_category': main_component_category,
         'sauce_tab_name': sauce_tab_name,
+        'packaging_tab_name': packaging_tab_name,
         'pouch_tab_name': pouch_tab_name,
         'all_batches': [
             {
@@ -2314,6 +2409,7 @@ def production_batch_detail_view(request, site_slug, production_date):
         ],
 
         'saved_batch_containers': batch_containers_data,
+        'between_out_qty_map': between_out_qty_map,  # ✅ Pass map to frontend for instant population
         'meat_container_openings': meat_container_openings,
         'saved_cert_data': cert_data_dict,
         'saved_sauce_data': sauce_data_dict,

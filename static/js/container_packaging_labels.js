@@ -18,6 +18,15 @@
             .then(function(response) { return response.json(); })
             .then(function(data) {
                 var unitText = data.unit_abbreviation || data.unit_name || '-';
+                
+                // Store unit globally for use in booking_live_calc.js
+                window.currentStockItemUnit = unitText;
+                
+                // Trigger price recalculation in booking_live_calc.js after unit is set
+                if (typeof window.triggerPriceCalculation === 'function') {
+                    window.triggerPriceCalculation();
+                }
+                
                 if (unitDisplay) unitDisplay.textContent = unitText;
 
             })

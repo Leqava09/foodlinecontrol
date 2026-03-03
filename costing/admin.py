@@ -1562,14 +1562,16 @@ class BillingDocumentHeaderForm(forms.ModelForm):
 
         # Setup delivery_institution field with dynamic filtering
         if 'delivery_institution' in self.fields:
-            # If editing existing object with a client, filter by that client
+            # Show all delivery sites initially, then filter by client if selected
             if self.instance.pk and self.instance.client_id:
+                # Editing existing object - show institutions for that client
                 self.fields['delivery_institution'].queryset = DeliverySite.objects.filter(
                     client=self.instance.client
                 ).order_by('institutionname')
             else:
-                # Empty queryset initially (will be populated by client selection)
-                self.fields['delivery_institution'].queryset = DeliverySite.objects.none()
+                # New object or no client selected yet - show ALL institutions
+                # (JavaScript will filter these when client is selected)
+                self.fields['delivery_institution'].queryset = DeliverySite.objects.all().order_by('institutionname')
             
             # Add data attribute for JavaScript to enable dynamic filtering
             self.fields['delivery_institution'].widget.attrs['data-chained-field'] = 'client'

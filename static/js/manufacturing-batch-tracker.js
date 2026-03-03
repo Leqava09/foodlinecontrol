@@ -924,6 +924,11 @@ function loadMeatContainers() {
       updateBalanceFromPrevShift(select);
     }
     
+    const bookOutInput = card.querySelector('input[name="book_out_qty[]"]');
+    if (bookOutInput) {
+      bookOutInput.value = container.book_out_qty || 0;
+    }
+    
     const stockLeftInput = card.querySelector('input[name="stock_left[]"]');
     if (stockLeftInput) {
       stockLeftInput.value = container.stock_left || 0;
@@ -1029,10 +1034,6 @@ function renderMeatTab() {
   }
   
     html += `</select>
-
-          <select id="container-options-template-local" style="display: none;">
-          <!-- local options here -->
-          </select>
 
           <!-- Container cards go here -->
           <div class="container-row"></div>
@@ -1580,23 +1581,23 @@ function renderProcessingTab() {
 		</div>
 		<div class="form-group">
 		  <label>Unsealed/Poor Seal</label>
-		  <input type="number" name="unsealed_poor_seal" value="0">
+		  <input type="number" name="unsealed_poor_seal" value="0" onchange="calculateMachineTotal()">
 		</div>
 		<div class="form-group">
 		  <label>Screwed/Undated</label>
-		  <input type="number" name="screwed_and_undated" value="0">
+		  <input type="number" name="screwed_and_undated" value="0" onchange="calculateMachineTotal()">
 		</div>
 		<div class="form-group">
 		  <label>Over Weight</label>
-		  <input type="number" name="over_weight" value="0">
+		  <input type="number" name="over_weight" value="0" onchange="calculateMachineTotal()">
 		</div>
 		<div class="form-group">
 		  <label>Under Weight</label>
-		  <input type="number" name="under_weight" value="0">
+		  <input type="number" name="under_weight" value="0" onchange="calculateMachineTotal()">
 		</div>
 		<div class="form-group">
 		  <label>Empty Pouches</label>
-		  <input type="number" name="empty_pouches" value="0">
+		  <input type="number" name="empty_pouches" value="0" onchange="calculateMachineTotal()">
 		</div>
 		<div class="form-group">
 		  <label>Metal Detection</label>
@@ -1644,7 +1645,7 @@ function renderProcessingTab() {
 		</div>
 		<div class="form-group">
 		  <label>Unclear Coding (Total from Retort)</label>
-		  <input type="number" name="total_unclear_coding" value="0" onchange="updateUnClearCodingTotal()">
+		  <input type="number" name="total_unclear_coding" value="0" onchange="calculateRetortTotal()">
 		</div>
 		<div class="form-group">
 		  <label>Seal Creap</label>
@@ -1652,7 +1653,7 @@ function renderProcessingTab() {
 		</div>
 		<div class="form-group">
 		  <label>Under Weight</label>
-		  <input type="number" name="retort_under_weight" value="0">
+		  <input type="number" name="retort_under_weight" value="0" onchange="calculateRetortTotal()">
 		</div>
 		<div class="form-group">
 		  <label>Poor Ceiling Destroyed</label>
@@ -2503,8 +2504,65 @@ function calculatePackagingSummary() {
 function syncSummaryDataFromTabs() {
     const tabData = {};
     
+    // ✅ FIRST: Load SAVED PRODUCT USAGE DATA (from backend)
+    const savedProductUsage = window.BATCH_DATA.saved_product_usage_data || {};
+    const mainComponents = window.BATCH_DATA.main_product_components || {};
+    const components = window.BATCH_DATA.components || {};
+    const recipes = window.BATCH_DATA.recipes || {};
+    
+    // Load main product components from saved data
+    for (const mainKey in mainComponents) {
+        const comp = mainComponents[mainKey];
+        const stockItemId = comp.stock_item_id;
+        const saved = savedProductUsage[stockItemId];
+        
+        if (saved) {
+            const key = `main_${stockItemId}`;
+            tabData[key] = { 
+                batchRef: saved.ref_number || '', 
+                used: saved.qty_used || 0 
+            };
+        }
+    }
+    
+    // Load product components from saved data
+    for (const compKey in components) {
+        const comp = components[compKey];
+        const stockItemId = comp.stock_item_id;
+        const saved = savedProductUsage[stockItemId];
+        
+        if (saved && !((`comp_${stockItemId}`) in tabData)) {
+            const key = `comp_${stockItemId}`;
+            tabData[key] = { 
+                batchRef: saved.ref_number || '', 
+                used: saved.qty_used || 0 
+            };
+        }
+    }
+    
+    // Load recipe items from saved data
+    for (const recipeId in recipes) {
+        const recipe = recipes[recipeId];
+        const recipeItems = recipe.recipe_items || {};
+        for (const itemId in recipeItems) {
+            const item = recipeItems[itemId];
+            const stockItemId = item.stock_item_id;
+            const saved = savedProductUsage[stockItemId];
+            
+            if (saved) {
+                const key = `recipe_${stockItemId}`;
+                if (!(key in tabData)) {  // Don't overwrite existing data
+                    tabData[key] = { 
+                        batchRef: saved.ref_number || '', 
+                        used: saved.qty_used || 0 
+                    };
+                }
+            }
+        }
+    }
+    
     // ============ SAUCE TAB RECIPE ITEMS ============
-    // READ THE ACTUAL "Usage for Day" INPUT VALUES
+    // READ THE ACTUAL "Usage for Day" INPUT VALUES (OVERRIDE saved data)
     document.querySelectorAll('input[name^="sauce_usage_"]').forEach(usageInput => {
         const stockItemId = usageInput.name.replace('sauce_usage_', '');
         const batchRefInput = document.querySelector(`input[name="sauce_batch_ref_${stockItemId}"]`);
@@ -2517,7 +2575,7 @@ function syncSummaryDataFromTabs() {
     });
     
     // ============ PACKAGING TAB ITEMS ============
-    // READ THE ACTUAL "Usage for Day" INPUT VALUES
+    // READ THE ACTUAL "Usage for Day" INPUT VALUES (OVERRIDE saved data)
     document.querySelectorAll('input[name^="pkg_usage_"]').forEach(usageInput => {
         const stockItemId = usageInput.name.replace('pkg_usage_', '');
         const batchRefInput = document.querySelector(`input[name="pkg_batch_ref_${stockItemId}"]`);
@@ -2543,7 +2601,7 @@ function syncSummaryDataFromTabs() {
 }
 
 function syncMeatDataToSummary() {
-    // Get all container selects and kg inputs
+    // Get all container selects and kg inputs from meat tab
     const containerSelects = document.querySelectorAll('select[name="container_id[]"]');
     const kgInputs = document.querySelectorAll('input[name="kg_frozen_meat_used[]"]');
     
@@ -2565,21 +2623,27 @@ function syncMeatDataToSummary() {
         }
     });
     
-    // Update Summary table for Frozen Chicken Liver (main_7)
-    const batchRefInput = document.querySelector('input[name="summary_batch_ref_main_7"]');
-    const usedInput = document.querySelector('input[name="summary_used_main_7"]');
-    
-    if (batchRefInput) {
-        batchRefInput.value = containerNumbers.join(', ');
+    // ✅ Get the main product component dynamically
+    const mainComponents = window.BATCH_DATA.main_product_components || {};
+    for (const mainKey in mainComponents) {
+        const comp = mainComponents[mainKey];
+        const stockItemId = comp.stock_item_id;
+        
+        // Update Summary table with meat data using dynamic stock item ID
+        const batchRefInput = document.querySelector(`input[name="summary_batch_ref_main_${stockItemId}"]`);
+        const usedInput = document.querySelector(`input[name="summary_used_main_${stockItemId}"]`);
+        
+        if (batchRefInput) {
+            batchRefInput.value = containerNumbers.join(', ');
+        }
+        
+        if (usedInput) {
+            const displayText = kgValues.length > 0 
+                ? `${kgValues.join(', ')} (${totalKgUsed} Combined)`
+                : totalKgUsed.toFixed(2);
+            usedInput.value = displayText;
+        }
     }
-    
-    if (usedInput) {
-        const displayText = kgValues.length > 0 
-            ? `${kgValues.join(', ')} (${totalKgUsed} Combined)`
-            : totalKgUsed.toFixed(2);
-        usedInput.value = displayText;
-    }
-    
 }
 
 function calculateSummaryDifferences() {
@@ -2884,25 +2948,75 @@ window.updateBalanceFromPrevShift = function(selectElement) {
 };
 
 // ✅ EXISTING FUNCTION: populateBookOutQty
+// ✅ NOW: Works like sauce/packaging - pulls from SAVED DATA first
+// Only if no saved data, check for NEW transactions from today
 window.populateBookOutQty = function(selectElement) {
   try {
     const containerRef = selectElement.value;
     const card = selectElement.closest('.container-card');
     const bookOutInput = card?.querySelector('.book-out-qty-input');
     
-    // Query stock transactions for book out qty
+    if (!bookOutInput) return;
+    
+    if (!containerRef) {
+      bookOutInput.value = '0.00';
+      return;
+    }
+    
+    // ✅ STEP 0: Check if there's a value in the between_out_qty_map (instant lookup before save)
+    const betweenOutMap = window.BATCH_DATA?.between_out_qty_map || {};
+    if (betweenOutMap[containerRef] !== undefined && betweenOutMap[containerRef] !== null) {
+      bookOutInput.value = parseFloat(betweenOutMap[containerRef]).toFixed(2);
+      return;
+    }
+    
+    // ✅ STEP 1: Check if there's SAVED data for this container
+    // (stored in window.BATCH_DATA.saved_batch_containers)
+    const savedContainers = window.BATCH_DATA?.saved_batch_containers || [];
+    const savedContainer = savedContainers.find(c => {
+      const id = c.container_id || c.batch_ref;
+      return id === containerRef;
+    });
+    
+    if (savedContainer && savedContainer.book_out_qty !== undefined && savedContainer.book_out_qty !== null) {
+      // Use saved value
+      bookOutInput.value = parseFloat(savedContainer.book_out_qty).toFixed(2);
+      return;
+    }
+    
+    // ✅ STEP 2: No saved data - check for NEW transactions from today
+    const prodDate = window.BATCH_DATA?.production_date; // Format: "dd/mm/yyyy"
+    if (!prodDate) {
+      bookOutInput.value = '0.00';
+      return;
+    }
+    
+    // Convert production_date to YYYY-MM-DD format for comparison
+    const [day, month, year] = prodDate.split('/');
+    const normalizedProdDate = `${year}-${month}-${day}`;
+    
+    // Query stock transactions for NEW book out (created today)
     const transactions = window.BATCH_DATA.stock_transactions || [];
-    const bookOut = transactions.find(t => 
-      t.batch_ref === containerRef && t.transaction_type === 'OUT'
+    
+    // ✅ ONLY populate if transaction was created TODAY
+    const newBookOut = transactions.find(t => 
+      t.batch_ref === containerRef && 
+      t.transaction_type === 'OUT' &&
+      t.transaction_date === normalizedProdDate  // ← ONLY TODAY
     );
     
-    if (bookOutInput && bookOut) {
-      bookOutInput.value = parseFloat(bookOut.quantity || 0).toFixed(2);
-    } else if (bookOutInput) {
+    if (newBookOut && parseFloat(newBookOut.quantity) > 0) {
+      bookOutInput.value = parseFloat(newBookOut.quantity || 0).toFixed(2);
+    } else {
+      // No saved data and no new transaction - start at 0
       bookOutInput.value = '0.00';
     }
   } catch (e) {
-
+    // Fallback to 0
+    const card = selectElement?.closest('.container-card');
+    if (card?.querySelector('.book-out-qty-input')) {
+      card.querySelector('.book-out-qty-input').value = '0.00';
+    }
   }
 };
 
@@ -3003,9 +3117,6 @@ function loadSavedData() {
   if (containerData.length > 0) {
     const row = document.querySelector('.container-row');
 
-	containerData.forEach((c, idx) => {
-	});
-  
     if (row) {
       containerData.forEach(container => {
 	  // ✅ SWITCH SOURCE FIRST if it's LOCAL
@@ -3024,8 +3135,22 @@ function loadSavedData() {
 	  if (select) {
 		const value = container.container_id || container.batch_ref;
 		select.value = value;
-		populateBookOutQty(select);
-		updateBalanceFromPrevShift(select);  // ✅ THIS LOADS THE BALANCE
+	  }
+
+	  // ✅ LOAD SAVED OPENING BALANCE DIRECTLY (from previous production)
+	  const balanceInput = lastCard?.querySelector('input[name="balance_from_prev_shift[]"]');
+	  if (balanceInput && container.opening_balance !== undefined && container.opening_balance !== null) {
+		balanceInput.value = parseFloat(container.opening_balance).toFixed(2);
+	  } else if (balanceInput) {
+		balanceInput.value = '0.00';
+	  }
+	  
+	  // ✅ LOAD SAVED BOOK OUT QTY DIRECTLY (like packaging/sauce do)
+	  const bookOutInput = lastCard?.querySelector('input[name="book_out_qty[]"]');
+	  if (bookOutInput && container.book_out_qty !== undefined && container.book_out_qty !== null) {
+		bookOutInput.value = parseFloat(container.book_out_qty).toFixed(2);
+	  } else if (bookOutInput) {
+		bookOutInput.value = '0.00';
 	  }
 
 	  // Load stock left
@@ -3386,14 +3511,12 @@ function populateBookOutQty(selectElement) {
   const card = selectElement.closest('.meat-card') || selectElement.closest('.container-card');
   
   if (!card) {
-
     return;
   }
   
   const bookOutInput = card.querySelector('.book-out-qty-input');
   
   if (!bookOutInput) {
-
     return;
   }
   
@@ -3404,16 +3527,48 @@ function populateBookOutQty(selectElement) {
     return;
   }
   
+  // ✅ STEP 0: Check if there's a value in the between_out_qty_map (instant lookup before save)
+  const betweenOutMap = window.BATCH_DATA?.between_out_qty_map || {};
+  if (betweenOutMap[refValue] !== undefined && betweenOutMap[refValue] !== null) {
+    bookOutInput.value = parseFloat(betweenOutMap[refValue]).toFixed(2);
+    return;
+  }
+  
+  // ✅ STEP 1: Check if there's SAVED data (like packaging/sauce do)
+  const savedContainers = window.BATCH_DATA?.saved_batch_containers || [];
+  const savedContainer = savedContainers.find(c => {
+    const id = c.container_id || c.batch_ref;
+    return id === refValue;
+  });
+  
+  if (savedContainer && savedContainer.book_out_qty !== undefined && savedContainer.book_out_qty !== null) {
+    // Use saved value
+    bookOutInput.value = parseFloat(savedContainer.book_out_qty).toFixed(2);
+    return;
+  }
+  
+  // ✅ STEP 2: No saved data - check for NEW transactions from today
+  const prodDate = window.BATCH_DATA?.production_date;
+  if (!prodDate) {
+    bookOutInput.value = '0';
+    return;
+  }
+  
+  // Convert production_date to YYYY-MM-DD format for comparison
+  const [day, month, year] = prodDate.split('/');
+  const normalizedProdDate = `${year}-${month}-${day}`;
+  
   // Get all stock transactions
   const stockTransactions = window.BATCH_DATA?.stock_transactions || [];
   
-  // Find matching OUT transaction for this batch_ref
+  // ✅ ONLY populate if transaction was created TODAY
   const matchingTx = stockTransactions.find(tx => 
     tx.batch_ref === refValue && 
-    tx.transaction_type === 'OUT'
+    tx.transaction_type === 'OUT' &&
+    tx.transaction_date === normalizedProdDate  // ← ONLY TODAY
   );
   
-  if (matchingTx) {
+  if (matchingTx && parseFloat(matchingTx.quantity) > 0) {
     bookOutInput.value = parseFloat(matchingTx.quantity) || '0';
   } else {
     bookOutInput.value = '0';
@@ -3545,7 +3700,7 @@ window.calculateMachineTotal = function() {
 };
 
 window.calculateRetortTotal = function() {
-  const fields = ['unclear_coding', 'retort_seal_creap', 'retort_under_weight', 'poor_ceiling_destroyed'];
+  const fields = ['total_unclear_coding', 'retort_seal_creap', 'retort_under_weight', 'poor_ceiling_destroyed'];
   let total = 0;
   fields.forEach(name => {
     const el = document.querySelector(`input[name="${name}"]`);

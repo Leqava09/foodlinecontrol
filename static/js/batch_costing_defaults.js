@@ -19,11 +19,38 @@
         // Set overhead default
         if (overheadField && overheadField.value === '') {
             overheadField.value = '1';
+            // Update display after a short delay to ensure everything is ready
+            setTimeout(() => {
+                if (typeof updateCostingDisplay === 'function') {
+                    updateCostingDisplay('overhead', '1');
+                }
+            }, 150);
         }
         
         // Set salary default
         if (salaryField && salaryField.value === '') {
             salaryField.value = '1';
+            // Update display after a short delay to ensure everything is ready
+            setTimeout(() => {
+                if (typeof updateCostingDisplay === 'function') {
+                    updateCostingDisplay('salary', '1');
+                }
+            }, 150);
+        }
+        
+        // Set investor/loan default
+        if (investorLoanField && investorLoanField.value === '') {
+            investorLoanField.value = '1';
+            console.log('✅ Set investor_loan default to 1');
+            // Update display after a short delay to ensure DOM and functions are ready
+            setTimeout(() => {
+                console.log('Calling updateCostingDisplay for investor_loan...');
+                if (typeof updateCostingDisplay === 'function') {
+                    updateCostingDisplay('investor_loan', '1');
+                } else {
+                    console.warn('updateCostingDisplay function not available');
+                }
+            }, 150);
         }
         
         // Auto-populate stock_item_price_use from API (editable field ONLY)
@@ -156,7 +183,7 @@
             const currency = window.COMPANY_CURRENCY || 'R';
             
             // Fetch price per unit for the selected costing
-            fetch(`/admin/costing/get-costing-price/${costingType}/${costingId}/`)
+            fetch(`/costing/get-costing-price/${costingType}/${costingId}/`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.price_per_unit !== undefined) {

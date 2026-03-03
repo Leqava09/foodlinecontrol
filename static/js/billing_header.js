@@ -55,21 +55,20 @@
         var $institutionField = $('#id_delivery_institution');
         
         if ($clientField.length && $institutionField.length) {
+            // Store the original options so we can reset/restore them
+            var allOptions = $institutionField.find('option').clone();
+            
             // Function to fetch and update institutions for selected client
             function updateInstitutions() {
                 var clientId = $clientField.val();
                 
                 if (!clientId) {
-                    // No client selected, disable institution field
-                    $institutionField.empty().append(
-                        $('<option value="">---------</option>')
-                    ).prop('disabled', true);
+                    // No client selected - show all institutions
+                    $institutionField.empty().html(allOptions);
                     return;
                 }
                 
-                // Enable field and fetch institutions for this client
-                $institutionField.prop('disabled', false);
-                
+                // Fetch institutions for this client
                 $.ajax({
                     url: '/inventory/api/delivery-sites/',
                     data: {client_id: clientId},
@@ -78,7 +77,7 @@
                         var sites = data.sites || [];
                         var currentSelection = $institutionField.val();
                         
-                        // Rebuild dropdown
+                        // Rebuild dropdown with only this client's sites
                         $institutionField.empty().append(
                             $('<option value="">---------</option>')
                         );
@@ -99,7 +98,7 @@
                     error: function() {
                         $institutionField.empty().append(
                             $('<option value="">Error loading institutions</option>')
-                        ).prop('disabled', true);
+                        );
                     }
                 });
             }

@@ -1,4 +1,5 @@
 from django import forms
+from django.forms.widgets import DateInput
 from .models import Person, Training, Induction, Leave
 
 DATE_INPUTS = ["%d-%m-%Y", "%Y-%m-%d"]  # dd-mm-yyyy + ISO
@@ -8,10 +9,7 @@ class PersonAdminForm(forms.ModelForm):
     hire_date = forms.DateField(
         required=True,
         input_formats=DATE_INPUTS,
-        widget=forms.DateInput(
-            format="%d-%m-%Y",
-            attrs={"class": "vDateField"},
-        ),
+        widget=DateInput(attrs={'class': 'vDateField'}),
     )
 
     class Meta:
@@ -23,18 +21,12 @@ class TrainingInlineForm(forms.ModelForm):
     training_date = forms.DateField(
         required=True,
         input_formats=DATE_INPUTS,
-        widget=forms.DateInput(
-            format="%d-%m-%Y",
-            attrs={"class": "vDateField"},
-        ),
+        widget=DateInput(attrs={'class': 'vDateField'}),
     )
     next_review_date = forms.DateField(
         required=False,
         input_formats=DATE_INPUTS,
-        widget=forms.DateInput(
-            format="%d-%m-%Y",
-            attrs={"class": "vDateField"},
-        ),
+        widget=DateInput(attrs={'class': 'vDateField'}),
     )
 
     class Meta:
@@ -46,18 +38,12 @@ class InductionInlineForm(forms.ModelForm):
     induction_date = forms.DateField(
         required=True,
         input_formats=DATE_INPUTS,
-        widget=forms.DateInput(
-            format="%d-%m-%Y",
-            attrs={"class": "vDateField"},
-        ),
+        widget=DateInput(attrs={'class': 'vDateField'}),
     )
     next_review_date = forms.DateField(
         required=False,
         input_formats=DATE_INPUTS,
-        widget=forms.DateInput(
-            format="%d-%m-%Y",
-            attrs={"class": "vDateField"},
-        ),
+        widget=DateInput(attrs={'class': 'vDateField'}),
     )
 
     class Meta:
@@ -69,26 +55,17 @@ class LeaveInlineForm(forms.ModelForm):
     start_date = forms.DateField(
         required=True,
         input_formats=DATE_INPUTS,
-        widget=forms.DateInput(
-            format="%d-%m-%Y",
-            attrs={"class": "vDateField"},
-        ),
+        widget=DateInput(attrs={'class': 'vDateField'}),
     )
     end_date = forms.DateField(
         required=True,
         input_formats=DATE_INPUTS,
-        widget=forms.DateInput(
-            format="%d-%m-%Y",
-            attrs={"class": "vDateField"},
-        ),
+        widget=DateInput(attrs={'class': 'vDateField'}),
     )
     approval_date = forms.DateField(
         required=False,
         input_formats=DATE_INPUTS,
-        widget=forms.DateInput(
-            format="%d-%m-%Y",
-            attrs={"class": "vDateField"},
-        ),
+        widget=DateInput(attrs={'class': 'vDateField'}),
     )
 
     class Meta:

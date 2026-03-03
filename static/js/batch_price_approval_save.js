@@ -21,7 +21,20 @@
     }
 
     function getCsrfToken() {
-        return getCookie('csrftoken');
+        // Try 1: Get from cookie
+        let token = getCookie('csrftoken');
+        if (token) return token;
+        
+        // Try 2: Get from meta tag (Django default)
+        const metaTag = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (metaTag) return metaTag.value;
+        
+        // Try 3: Get from input field in form
+        const inputField = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (inputField) return inputField.value;
+        
+        console.warn('CSRF token not found');
+        return '';
     }
 
     let pendingRequests = new Set();
@@ -51,12 +64,12 @@
     function saveApproval(element) {
         const id = element.dataset.approvalId;
         if (!id) {
-
+            console.warn('No approval ID found on element', element);
             return;
         }
 
         if (recentlySaved.has(id)) {
-
+            console.log('Recently saved, skipping:', id);
             return;
         }
 
@@ -71,6 +84,7 @@
             savedValue = price;
             fieldType = 'price';
             payload.append('batch_price_per_unit', price);
+            console.log('Saving price:', { id, price, fieldType });
 
         } 
         else if (element.classList.contains('batch-approval-checkbox')) {
@@ -78,9 +92,11 @@
             savedValue = approved;
             fieldType = 'checkbox';
             payload.append('is_approved', approved ? 'true' : 'false');
+            console.log('Saving checkbox:', { id, approved, fieldType });
 
         } 
         else {
+            console.warn('Unknown element type', element);
             return;
         }
 
@@ -91,6 +107,8 @@
         const url = `/costing/admin/batch-price-approval/${id}/update/`;
         const csrfToken = getCsrfToken();
         const requestId = `approval-${id}-${fieldType}-${Date.now()}`;
+        
+        console.log('AJAX Request:', { url, csrfToken: csrfToken ? 'present' : 'MISSING', requestId });
         
         pendingRequests.add(requestId);
         recentlySaved.add(id);
@@ -104,12 +122,12 @@
             credentials: 'same-origin'
         })
         .then(response => {
-
+            console.log('Response received:', { status: response.status, requestId });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             return response.json();
         })
         .then(data => {
-
+            console.log('Save successful:', { data, requestId, id, fieldType });
             if (fieldType === 'price') {
                 element.style.borderColor = '#4caf50';
                 element.style.boxShadow = '0 0 5px #4caf50';
@@ -120,7 +138,14 @@
             }
         })
         .catch(error => {
-
+            console.error('❌ Save approval FAILED:', {
+                error: error.message,
+                approval_id: id,
+                field_type: fieldType,
+                url: url,
+                requestId: requestId,
+                stack: error.stack
+            });
         })
         .finally(() => {
             pendingRequests.delete(requestId);
