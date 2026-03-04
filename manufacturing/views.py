@@ -669,8 +669,17 @@ def get_available_containers_with_stock(batch, current_site=None):
     """
     Returns containers with calculated available_stock.
     ONLY counts usage from production_dates BEFORE the current production_date.
+    Filters to ONLY containers with stock_items in the MAIN product component category.
     """
-    available_containers = Container.objects.filter(status='Available')
+    # ✅ Get the main product component category dynamically (same as stock transactions)
+    main_comp = batch.product.main_product_components.select_related('category').first() if batch.product else None
+    main_component_category = main_comp.category.name if main_comp and main_comp.category else 'Meat'
+    
+    # ✅ Filter containers by: status='Available' AND stock_item category matches main component
+    available_containers = Container.objects.filter(
+        status='Available',
+        stock_item__category__name__iexact=main_component_category
+    )
     if current_site:
         available_containers = available_containers.filter(site=current_site)
     available_containers = available_containers.order_by('container_number')
