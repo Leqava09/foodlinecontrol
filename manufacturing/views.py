@@ -428,7 +428,7 @@ def get_packaging_data(batch, current_site=None, packaging_category=None):
             ).order_by('-production_date').first()
             batch_ref_balance = previous_packaging.batch_ref if previous_packaging else ''
             
-            # ✅ GET BOOKED OUT BATCH REF (from latest unused StockTransaction)
+            # ✅ GET BOOKED OUT BATCH REF (from ALL OUT transactions, not just the first)
             # ✅ EXCLUDE transactions with manufacturing batch patterns
             import re
             mfg_pattern = r'[A-Z]\d{5}CH\d{2}[A-Z]'
@@ -467,7 +467,16 @@ def get_packaging_data(batch, current_site=None, packaging_category=None):
             # ✅ FILTER OUT transactions with manufacturing batch refs
             valid_bookouts = [tx for tx in all_bookouts if not (tx.batch_ref and re.search(mfg_pattern, tx.batch_ref))]
             
-            # ✅ USE THE FIRST VALID (non-manufacturing) TRANSACTION
+            # ✅ COLLECT ALL VALID BATCH REFS from all transactions (not just first one)
+            # Group by batch_ref and keep unique references in order
+            batch_refs_list = []
+            seen_refs = set()
+            for tx in valid_bookouts:
+                if tx.batch_ref and tx.batch_ref not in seen_refs:
+                    batch_refs_list.append(tx.batch_ref)
+                    seen_refs.add(tx.batch_ref)
+            
+            # Latest transaction for qty info
             latest_unused = valid_bookouts[0] if valid_bookouts else None
 
             # ✅ ===== NEW LOGIC: EXTRACT OPENING AND BOOKED REFS =====
@@ -503,14 +512,11 @@ def get_packaging_data(batch, current_site=None, packaging_category=None):
             if not opening_batch_ref and batch_ref_balance:
                 opening_batch_ref = batch_ref_balance
             
-            # If still empty, try from latest transaction
-            if not batch_ref_booked and latest_unused:
-                raw_batch_ref = latest_unused.batch_ref.split(',')[0].strip() if latest_unused.batch_ref else ''
-                # ✅ FILTER OUT manufacturing batch patterns (like A00825CH02A)
-                import re
-                if raw_batch_ref and not re.search(r'[A-Z]\d{5}CH\d{2}[A-Z]', raw_batch_ref):
-                    batch_ref_booked = raw_batch_ref
-                # else: ignore manufacturing batch ref
+            # If still empty, try from all transactions collected
+            if not batch_ref_booked and batch_refs_list:
+                # Join all batch refs with " / " separator (since there can be multiple bookouts)
+                batch_ref_booked = " / ".join(batch_refs_list)
+
     
             # ✅ COMBINE FOR DISPLAY
             if opening_batch_ref and batch_ref_booked:
