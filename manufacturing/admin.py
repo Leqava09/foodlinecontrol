@@ -378,6 +378,7 @@ class ProductionAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     change_list_template = 'admin/manufacturing/production_changelist.html'
     
     list_display = ('display_production_date',)
+    ordering = ['production_date']
     
     def has_delete_permission(self, request):
         """Hide Delete button from form - only allow deletion from list view"""

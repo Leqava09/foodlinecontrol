@@ -12,6 +12,9 @@ window.InventoryApp = class {
         this.currentSubcategory = null;
         this.resultsContainer = null;
 
+        // Detect site prefix once from the initial page URL (before any pushState changes it)
+        const siteMatch = window.location.pathname.match(/\/hq\/([^/]+)\//);
+        this.sitePath = siteMatch ? `/hq/${siteMatch[1]}` : '';
     }
 
     init() {
@@ -123,10 +126,7 @@ window.InventoryApp = class {
             if (this.currentCategory)    params.set('category', this.currentCategory);
             if (this.currentSubcategory) params.set('subcategory', this.currentSubcategory);
 
-            // Get the site slug from the current URL path
-            const pathMatch = window.location.pathname.match(/\/hq\/([^/]+)\//);
-            const sitePath = pathMatch ? `/hq/${pathMatch[1]}` : '';
-            window.location.href = `${sitePath}/admin/inventory/stocktransaction/add/?${params.toString()}`;
+            window.location.href = `${this.sitePath}/admin/inventory/stocktransaction/add/?${params.toString()}`;
         });
 
         const importBookingBtn = document.createElement('button');
@@ -139,9 +139,7 @@ window.InventoryApp = class {
             if (this.currentSubcategory) params.set('subcategory', this.currentSubcategory);
 
             // Get the site slug from the current URL path
-            const pathMatch = window.location.pathname.match(/\/hq\/([^/]+)\//);
-            const sitePath = pathMatch ? `/hq/${pathMatch[1]}` : '';
-            window.location.href = `${sitePath}/admin/inventory/container/add/?${params.toString()}`;
+            window.location.href = `${this.sitePath}/admin/inventory/container/add/?${params.toString()}`;
         });
         
         leftGroup.appendChild(localBookingBtn);
@@ -182,7 +180,7 @@ window.InventoryApp = class {
 			sessionStorage.removeItem('inventory_currentSubcategory');
 			
 			// Update URL to remove all filters
-			window.history.pushState({}, '', '/admin/inventory/stocktransaction/');
+			window.history.pushState({}, '', `${this.sitePath}/admin/inventory/stocktransaction/`);
 		});
 		mainTabsDiv.appendChild(allTab);
 
@@ -205,8 +203,8 @@ window.InventoryApp = class {
 				if (this.currentCategory) params.set('category', this.currentCategory);
 				const qs = params.toString();
 				const newUrl = qs 
-					? `/admin/inventory/stocktransaction/?${qs}` 
-					: `/admin/inventory/stocktransaction/`;
+					? `${this.sitePath}/admin/inventory/stocktransaction/?${qs}` 
+					: `${this.sitePath}/admin/inventory/stocktransaction/`;
 				window.history.pushState({}, '', newUrl);
 			});
 			mainTabsDiv.appendChild(tab);
@@ -277,8 +275,8 @@ window.InventoryApp = class {
 				if (this.currentSubcategory) params.set('subcategory', this.currentSubcategory);
 				const qs = params.toString();
 				const newUrl = qs 
-					? `/admin/inventory/stocktransaction/?${qs}` 
-					: `/admin/inventory/stocktransaction/`;
+					? `${this.sitePath}/admin/inventory/stocktransaction/?${qs}` 
+					: `${this.sitePath}/admin/inventory/stocktransaction/`;
 
 
 				window.history.pushState({}, '', newUrl);
@@ -388,9 +386,7 @@ window.InventoryApp = class {
             if (this.currentSubcategory) params.set('subcategory', this.currentSubcategory);
 
             // Get the site slug from the current URL path
-            const pathMatch = window.location.pathname.match(/\/hq\/([^/]+)\//);
-            const sitePath = pathMatch ? `/hq/${pathMatch[1]}` : '';
-            window.location.href = `${sitePath}/admin/inventory/stocktransaction/add/?${params.toString()}`;
+            window.location.href = `${this.sitePath}/admin/inventory/stocktransaction/add/?${params.toString()}`;
         });
 
         const amendmentBtn = document.createElement('button');
@@ -403,9 +399,7 @@ window.InventoryApp = class {
             if (this.currentSubcategory) params.set('subcategory', this.currentSubcategory);
 
             // Get the site slug from the current URL path
-            const pathMatch = window.location.pathname.match(/\/hq\/([^/]+)\//);
-            const sitePath = pathMatch ? `/hq/${pathMatch[1]}` : '';
-            window.location.href = `${sitePath}/admin/inventory/amendment/add/?${params.toString()}`;
+            window.location.href = `${this.sitePath}/admin/inventory/amendment/add/?${params.toString()}`;
         });
         
         // ✅ ADD ARCHIVE/RESTORE BUTTON
@@ -417,9 +411,7 @@ window.InventoryApp = class {
         archiveBtn.innerHTML = isArchived ? '↩ Restore' : '📦 Archive';
         archiveBtn.addEventListener('click', () => {
             if (confirm(`${isArchived ? 'Restore' : 'Archive'} this batch group (${batchRef})?`)) {
-                const pathMatch = window.location.pathname.match(/\/hq\/([^/]+)\//);
-                const sitePath = pathMatch ? `/hq/${pathMatch[1]}` : '';
-                fetch(`${sitePath}/admin/inventory/stocktransaction/archive-batch/?batch_ref=${encodeURIComponent(batchRef)}&action=${isArchived ? 'restore' : 'archive'}`, {
+                fetch(`${this.sitePath}/admin/inventory/stocktransaction/archive-batch/?batch_ref=${encodeURIComponent(batchRef)}&action=${isArchived ? 'restore' : 'archive'}`, {
                     method: 'POST',
                     headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value}
                 }).then(() => window.location.reload());
@@ -551,10 +543,8 @@ window.InventoryApp = class {
             link.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const nextUrl = this.buildNextUrl();
-                const pathMatch = window.location.pathname.match(/\/hq\/([^/]+)\//);
-                const sitePath = pathMatch ? `/hq/${pathMatch[1]}` : '';
                 window.location.href =
-                    `${sitePath}/admin/inventory/stocktransaction/${entry.id}/change/?transaction_type=${entry.transaction_type}` +
+                    `${this.sitePath}/admin/inventory/stocktransaction/${entry.id}/change/?transaction_type=${entry.transaction_type}` +
                     `&next=${encodeURIComponent(nextUrl)}`;
             });
             activityCell.appendChild(link);
@@ -582,10 +572,8 @@ window.InventoryApp = class {
             link.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const nextUrl = this.buildNextUrl();
-                const pathMatch = window.location.pathname.match(/\/hq\/([^/]+)\//);
-                const sitePath = pathMatch ? `/hq/${pathMatch[1]}` : '';
                 window.location.href =
-                    `${sitePath}/admin/inventory/amendment/${entry.id}/change/?next=${encodeURIComponent(nextUrl)}`;
+                    `${this.sitePath}/admin/inventory/amendment/${entry.id}/change/?next=${encodeURIComponent(nextUrl)}`;
             });
             activityCell.appendChild(link);
         } else if (entry.type === 'manufacturing') {
@@ -636,9 +624,7 @@ window.InventoryApp = class {
 
 
                     if (entry.type === 'transaction') {
-                        const pathMatch = window.location.pathname.match(/\/hq\/([^/]+)\//);
-                        const sitePath = pathMatch ? `/hq/${pathMatch[1]}` : '';
-                        const finalUrl = `${sitePath}/admin/inventory/stocktransaction/${entry.id}/change/?transaction_type=${entry.transaction_type}&next=${encodeURIComponent(nextUrl)}`;
+                        const finalUrl = `${this.sitePath}/admin/inventory/stocktransaction/${entry.id}/change/?transaction_type=${entry.transaction_type}&next=${encodeURIComponent(nextUrl)}`;
 
                         window.location.href = finalUrl;
                     } else if (entry.type === 'container') {
@@ -646,9 +632,7 @@ window.InventoryApp = class {
                         url.searchParams.set('next', nextUrl);
                         window.location.href = url.toString();
                     } else if (entry.type === 'amendment') {
-                        const pathMatch = window.location.pathname.match(/\/hq\/([^/]+)\//);
-                        const sitePath = pathMatch ? `/hq/${pathMatch[1]}` : '';
-                        const finalUrl = `${sitePath}/admin/inventory/amendment/${entry.id}/change/?next=${encodeURIComponent(nextUrl)}`;
+                        const finalUrl = `${this.sitePath}/admin/inventory/amendment/${entry.id}/change/?next=${encodeURIComponent(nextUrl)}`;
                         window.location.href = finalUrl;
                     }
                 });
