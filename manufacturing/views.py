@@ -428,6 +428,20 @@ def get_packaging_data(batch, current_site=None, packaging_category=None):
             ).order_by('-production_date').first()
             batch_ref_balance = previous_packaging.batch_ref if previous_packaging else ''
             
+            # ✅ If previous PackagingBalance has no batch_ref saved, fall back to
+            # the latest IN transaction batch_ref for this stock item (same as sauce)
+            if not batch_ref_balance and previous_packaging:
+                latest_in = StockTransaction.objects.filter(
+                    stock_item=stock_item,
+                    transaction_type='IN',
+                    transaction_date__lte=previous_packaging.production_date
+                ).exclude(batch_ref='').exclude(batch_ref__isnull=True)
+                if current_site:
+                    latest_in = latest_in.filter(site=current_site)
+                latest_in = latest_in.order_by('-transaction_date').first()
+                if latest_in:
+                    batch_ref_balance = latest_in.batch_ref
+            
             # ✅ GET BOOKED OUT BATCH REF (from ALL OUT transactions, not just the first)
             # ✅ EXCLUDE transactions with manufacturing batch patterns
             import re
@@ -1513,6 +1527,8 @@ def production_batch_detail_view(request, site_slug, production_date):
                         ).aggregate(sum=Sum('quantity'))['sum'] or Decimal('0')
                         booking_out_data[stock_item.id] = total_out
 
+                    effective_packing_category = (packaging_category or 'Packing').strip().lower()
+
                     usage_items_summary = []
                     for comp in all_components:
                         stock_item = comp.stock_item
@@ -1521,7 +1537,7 @@ def production_batch_detail_view(request, site_slug, production_date):
                         standard_usage = comp.standard_usage_per_production_unit or Decimal('0')
                         supposed_usage = total_production_day * standard_usage if total_production_day and standard_usage else Decimal('0')
                         
-                        if category_name == 'packing':
+                        if category_name == effective_packing_category:
                             pb = packaging_balances.get(stock_item.id)
                             if pb:
                                 booked = booking_out_data.get(stock_item.id, Decimal('0'))
@@ -1553,8 +1569,12 @@ def production_batch_detail_view(request, site_slug, production_date):
                         try:
                             stock_item = item_data['stock_item']
                             
-                            # ✅ USE INVENTORY BATCH REF ONLY - never use manufacturing batch refs
+                            # ✅ USE INVENTORY BATCH REF, fall back to PackagingBalance batch_ref for packaging items
                             batch_ref_for_item = inventory_batch_refs.get(stock_item.id, '')
+                            if not batch_ref_for_item:
+                                pb = packaging_balances.get(stock_item.id)
+                                if pb and pb.batch_ref:
+                                    batch_ref_for_item = pb.batch_ref
                             
                             st = StockTransaction.objects.create(
                                 category=stock_item.category,
@@ -1626,59 +1646,8 @@ def production_batch_detail_view(request, site_slug, production_date):
                             opening_balance = Decimal(request.POST.get(f'pkg_opening_{stock_item_id}', 0) or 0)
                             closing_balance = Decimal(closing_balance_str)
                             
-                            # ✅ REBUILD batch_ref fresh from DB (don't read from form like sauce)
-                            previous_packaging = PackagingBalance.objects.filter(
-                                stock_item=item,
-                                production_date__lt=batch.production_date
-                            ).order_by('-production_date').first()
-                            batch_ref_balance = previous_packaging.batch_ref if previous_packaging else ''
-                            
-                            import re
-                            if batch_ref_balance:
-                                # Check if it contains production batch pattern like "A00825CH02A"
-                                if re.search(r'[A-Z]\d{5}CH\d{2}[A-Z]', batch_ref_balance):
-                                    batch_ref_balance = ''
-                                # If it's a combined ref like "A00825CH02A / Toets 2 Pallet", only take the part after /
-                                elif ' / ' in batch_ref_balance:
-                                    parts = batch_ref_balance.split(' / ')
-                                    # Use the second part if the first part is a production batch
-                                    if re.search(r'[A-Z]\d{5}CH\d{2}[A-Z]', parts[0].strip()):
-                                        batch_ref_balance = parts[1].strip() if len(parts) > 1 else ''
-                                        
-                            previous_prod = Batch.objects.filter(
-                                production_date__lt=batch.production_date,
-                                product=batch.product
-                            ).order_by('-production_date').first()
-                            
-                            if previous_prod:
-                                all_bookouts = StockTransaction.objects.filter(
-                                    stock_item=item,
-                                    transaction_type='OUT',
-                                    transaction_date__gt=previous_prod.production_date,
-                                    transaction_date__lte=batch.production_date
-                                ).order_by('-transaction_date')
-                            else:
-                                all_bookouts = StockTransaction.objects.filter(
-                                    stock_item=item,
-                                    transaction_type='OUT',
-                                    transaction_date__lte=batch.production_date
-                                ).order_by('-transaction_date')
-                            
-                            latest_unused = all_bookouts.first() if all_bookouts.exists() else None
-                            batch_ref_booked_val = latest_unused.batch_ref.split(',')[0].strip() if latest_unused and latest_unused.batch_ref else ''
-                            # ✅ COMBINE batch_ref with " / " if both exist
-                            if batch_ref_balance and batch_ref_booked_val and batch_ref_balance != batch_ref_booked_val:
-                                # Both exist and different - combine them
-                                batch_ref = f"{batch_ref_balance} / {batch_ref_booked_val}"
-                            elif batch_ref_booked_val:
-                                # Only booked exists
-                                batch_ref = batch_ref_booked_val
-                            elif batch_ref_balance:
-                                # Only balance exists
-                                batch_ref = batch_ref_balance
-                            else:
-                                # Neither exists
-                                batch_ref = ''
+                            # ✅ Read batch_ref from form (same as sauce does)
+                            batch_ref = request.POST.get(f'pkg_batch_ref_{stock_item_id}', '').strip()
                             
                             # ✅ NEW: Auto-detect batch_ref type
                             batch_ref_type = get_batch_ref_type(batch_ref, item)

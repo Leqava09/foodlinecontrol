@@ -828,10 +828,15 @@ from .models import StockCategory, StockSubCategory, StockTransaction
 @admin.register(StockTransaction)
 class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
     def add_view(self, request, form_url='', extra_context=None):
-        """Override add_view to inject category from query string or batch_ref into POST"""
+        """Override add_view to inject category and store transaction type"""
+        extra_context = extra_context or {}
         category_id = request.GET.get('category')
         transaction_type = request.GET.get('transaction_type', 'IN')
         batch_ref = request.GET.get('batch_ref')
+        
+        # Store transaction type in session so get_fieldsets can access it
+        request.session['transaction_type'] = transaction_type
+        extra_context['transaction_type'] = transaction_type
         
         # For OUT bookings without explicit category, try to get from batch_ref
         if not category_id and transaction_type == 'OUT' and batch_ref:
@@ -862,8 +867,21 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
         
         return super().add_view(request, form_url, extra_context)
     
+    def _find_stock_item_from_batch_ref(self, batch_ref):
+        """Look up stock item from a batch_ref via Container or StockTransaction"""
+        if not batch_ref:
+            return None
+        from .models import Container, StockTransaction as ST
+        container = Container.objects.filter(container_number=batch_ref).first()
+        if container and container.stock_item:
+            return container.stock_item
+        tx = ST.objects.filter(batch_ref=batch_ref).order_by('pk').first()
+        if tx and tx.stock_item:
+            return tx.stock_item
+        return None
+
     def get_form(self, request, obj=None, **kwargs):
-        """Ensure instance has category before form renders"""
+        """Ensure instance has category before form renders, and wrap form to inject request/batch_ref"""
         # If this is a new object (obj is None), check for category from multiple sources
         category_id = None
         
@@ -884,19 +902,58 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
                 try:
                     from .models import StockCategory, StockTransaction
                     category = StockCategory.objects.get(id=category_id)
-                    # Create instance with category_id set (not category relation, to be safe)
                     obj = StockTransaction()
                     obj.category_id = int(category_id)
-                    # Store in request so form knows this was injected
                     request._injected_instance = True
                 except (StockCategory.DoesNotExist, ValueError, TypeError):
-                    # If we can't find category, just proceed without pre-setting it
-                    # The form __init__ will try to handle it
                     pass
         
-        # Pass request to form
-        kwargs['request'] = request
-        return super().get_form(request, obj, **kwargs)
+        FormClass = super().get_form(request, obj, **kwargs)
+        
+        # Wrap form class to inject request and batch_ref into __init__
+        batch_ref = request.GET.get('batch_ref')
+        _request = request
+        
+        class FormWithContext(FormClass):
+            def __init__(self, *args, **kw):
+                kw.setdefault('request', _request)
+                if batch_ref:
+                    kw.setdefault('batch_ref', batch_ref)
+                super().__init__(*args, **kw)
+        
+        FormWithContext.__name__ = FormClass.__name__
+        FormWithContext.__qualname__ = FormClass.__qualname__
+        
+        return FormWithContext
+
+    def get_changeform_initial_data(self, request):
+        """Pre-populate stock_item for OUT bookings"""
+        initial = super().get_changeform_initial_data(request)
+        transaction_type = request.GET.get('transaction_type', 'IN')
+        batch_ref = request.GET.get('batch_ref')
+        if transaction_type == 'OUT' and batch_ref:
+            stock_item = self._find_stock_item_from_batch_ref(batch_ref)
+            if stock_item:
+                initial['stock_item'] = stock_item.pk
+        return initial
+
+    def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
+        """Store current request for use by readonly field display methods"""
+        self.current_request = request
+        return super().render_change_form(request, context, add, change, form_url, obj)
+
+    def unit_of_measure_display(self, obj):
+        """Display unit of measure - handles new records by looking up from batch_ref"""
+        if obj and obj.stock_item and obj.stock_item.unit_of_measure:
+            return str(obj.stock_item.unit_of_measure)
+        # For new records, try to find from batch_ref in the request
+        if hasattr(self, 'current_request') and self.current_request:
+            batch_ref = self.current_request.GET.get('batch_ref')
+            stock_item = self._find_stock_item_from_batch_ref(batch_ref)
+            if stock_item and stock_item.unit_of_measure:
+                return str(stock_item.unit_of_measure)
+        return "-"
+    unit_of_measure_display.short_description = "Unit of Measure"
     
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """Filter foreign key dropdowns by site"""
@@ -1124,6 +1181,18 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
                     if not transaction_type:
                         transaction_type = self.request.session.get('transaction_type')
             
+            # ✅ For OUT bookings, ensure stock_item is in cleaned_data even if field is disabled
+            # Disabled fields won't appear in cleaned_data, so we need to get from initial
+            if transaction_type == 'OUT' and not cleaned_data.get('stock_item'):
+                if 'stock_item' in self.fields:
+                    stock_item_initial = self.fields['stock_item'].initial
+                    if stock_item_initial:
+                        from .models import StockItem
+                        try:
+                            cleaned_data['stock_item'] = StockItem.objects.get(id=stock_item_initial)
+                        except StockItem.DoesNotExist:
+                            pass
+            
             # Ensure category is available (from form or query string)
             if not cleaned_data.get('category') and self.request:
                 category_id = self.request.GET.get('category')
@@ -1171,18 +1240,6 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
                         pass
                     else:
                         raise forms.ValidationError("Category is required")
-            
-            transaction_type = cleaned_data.get('transaction_type')
-            
-            # For OUT bookings without transaction_type in cleaned_data, check instance or request
-            if not transaction_type:
-                if self.instance and self.instance.pk:
-                    transaction_type = self.instance.transaction_type
-                elif self.request:
-                    # Check GET first, then session (like get_fieldsets does)
-                    transaction_type = self.request.GET.get('transaction_type')
-                    if not transaction_type:
-                        transaction_type = self.request.session.get('transaction_type')
 
             # Get batch_ref from cleaned_data, then self.batch_ref, then instance
             batch_ref = cleaned_data.get('batch_ref') or self.batch_ref
@@ -1405,19 +1462,8 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
         
         return JsonResponse({'success': True, 'updated': updated})
 
-    def add_view(self, request, form_url='', extra_context=None):
-        """Override add_view to allow custom transaction types"""
-        extra_context = extra_context or {}
-        transaction_type = request.GET.get('transaction_type', 'IN')
-        
-        # Store transaction type in session so get_fieldsets can access it
-        request.session['transaction_type'] = transaction_type
-        extra_context['transaction_type'] = transaction_type
-        
-        return super().add_view(request, form_url, extra_context)
-
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
-        """Override to add back link to parent filtered view"""
+        """Override to add back link to parent filtered view and store transaction_type in session"""
         extra_context = extra_context or {}
         
         # Priority 1: Check for 'next' parameter (already being passed by the system)
@@ -1431,13 +1477,17 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
             session_key = f'stocktransaction_referrer_{object_id}'
             request.session[session_key] = back_url
         
+        # Store transaction_type in session for form rendering (for new records only)
+        transaction_type = request.GET.get('transaction_type')
+        if transaction_type and object_id is None:
+            request.session['transaction_type'] = transaction_type
+        
         return super().changeform_view(request, object_id, form_url, extra_context)
  
     def get_fieldsets(self, request, obj=None):
-        # Try to get from GET params first, then session
-        transaction_type = request.GET.get('transaction_type')
-        if not transaction_type:
-            transaction_type = request.session.get('transaction_type', 'IN')
+        # Priority: GET params > Session > 'IN' default
+        # GET params take priority to ensure URL-based navigation (Book Out button) works correctly
+        transaction_type = request.GET.get('transaction_type') or request.session.get('transaction_type', 'IN')
 
         if transaction_type == 'OUT':
             # Booking Out form
@@ -1547,15 +1597,7 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
         return ", ".join(a.reason for a in amendments) if amendments.exists() else "-"
     get_amendment_reason.short_description = "Amendment reason"
   
-    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
-        extra_context = extra_context or {}
-    
-        transaction_type = request.GET.get('transaction_type')
-    
-        if request.method == 'GET' and object_id is None and transaction_type in ['IN', 'OUT']:
-            extra_context['transaction_type'] = transaction_type
-    
-        return super().changeform_view(request, object_id, form_url, extra_context)
+
         
     def available_stock(self, obj):
         # Safely get category name without triggering RelatedObjectDoesNotExist
@@ -1686,6 +1728,26 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
         if not change:
             transaction_type = request.GET.get('transaction_type', 'IN')
             obj.transaction_type = transaction_type
+            
+            # ✅ For OUT bookings, explicitly set batch_ref from URL since form field is disabled
+            # Disabled fields don't submit in POST, so we must set it from GET param
+            if transaction_type == 'OUT':
+                batch_ref = request.GET.get('batch_ref')
+                if batch_ref:
+                    obj.batch_ref = batch_ref
+                
+                # ✅ If stock_item still not set, try to find from batch_ref
+                if not obj.stock_item and batch_ref:
+                    from .models import Container, StockTransaction
+                    # Try Container first
+                    container = Container.objects.filter(container_number=batch_ref).first()
+                    if container and container.stock_item:
+                        obj.stock_item = container.stock_item
+                    else:
+                        # Fallback to StockTransaction
+                        tx = StockTransaction.objects.filter(batch_ref=batch_ref).order_by('pk').first()
+                        if tx and tx.stock_item:
+                            obj.stock_item = tx.stock_item
         
         # For OUT bookings, ensure category is set from stock_item if still missing
         if not obj.category_id and obj.stock_item and obj.stock_item.category_id:
