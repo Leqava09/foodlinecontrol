@@ -78,9 +78,9 @@ class IncidentAdmin(SiteAwareModelAdmin, ArchivableAdmin):
             else:
                 print(f"DEBUG: No site filter applied! Returning all {batches.count()} batches", file=sys.stderr)
         
-        # Return batch options as JSON
+        # Return batch options as JSON (value must be pk for Django ModelChoiceField)
         data = [
-            {'value': batch.batch_number, 'display': str(batch)}
+            {'value': batch.pk, 'display': str(batch)}
             for batch in batches.order_by('batch_number')
         ]
         
@@ -180,12 +180,16 @@ class IncidentAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     
     def get_form(self, request, obj=None, **kwargs):
         """
-        Override form to exclude 'site' field in site admin context.
+        Override form to exclude 'site' field in site admin context
+        and pass request to form for site-aware batch filtering.
         """
         form_class = super().get_form(request, obj, **kwargs)
         
         # Check if we're in site context (not HQ)
         site_id = request.session.get('current_site_id')
+        
+        # Attach request to form class so form __init__ can access current_site
+        form_class._request = request
         
         # If in site context, exclude 'site' from form fields
         if site_id:
@@ -194,6 +198,7 @@ class IncidentAdmin(SiteAwareModelAdmin, ArchivableAdmin):
                 class Meta(form_class.Meta):
                     fields = [f for f in form_class.Meta.fields if f != 'site']
             
+            SiteIncidentForm._request = request
             return SiteIncidentForm
         
         return form_class

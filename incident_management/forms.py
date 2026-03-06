@@ -80,12 +80,26 @@ class IncidentForm(forms.ModelForm):
         self.fields['site'].required = False
         
         # Handle batch queryset filtering
+        # Get current_site from request attached by admin's get_form()
+        request = getattr(self.__class__, '_request', None)
+        current_site = getattr(request, 'current_site', None) if request else None
+        
         if self.instance and self.instance.pk:
             # Editing existing incident
             if self.data:
-                # Form submitted (POST) - Don't filter to prevent validation errors
-                # The JavaScript handles the filtering in the UI, but validation needs all batches
-                self.fields['batch'].queryset = Batch.objects.all().order_by('batch_number')
+                # Form submitted (POST) - include submitted batch + filtered batches
+                queryset = Batch.objects.all()
+                if current_site:
+                    queryset = queryset.filter(site=current_site)
+                elif self.instance.site:
+                    queryset = queryset.filter(site=self.instance.site)
+                if self.instance.production_date:
+                    queryset = queryset.filter(production_date=self.instance.production_date)
+                # Ensure submitted batch is always included
+                batch_id = self.data.get('batch')
+                if batch_id:
+                    queryset = (queryset | Batch.objects.filter(pk=batch_id)).distinct()
+                self.fields['batch'].queryset = queryset.order_by('batch_number')
             else:
                 # GET request - editing existing incident
                 # CRITICAL: Always include the currently selected batch in queryset
@@ -132,29 +146,34 @@ class IncidentForm(forms.ModelForm):
             # JavaScript will populate it after production_date is selected
             self.fields['batch'].queryset = Batch.objects.none()
         else:
-            # New incident form submitted (POST) - filter batches if site is selected
-            site_id = self.data.get('site')
+            # New incident form submitted (POST) - filter batches by production_date and site
             production_date = self.data.get('production_date')
             
-            if site_id:
-                queryset = Batch.objects.filter(site_id=site_id)
-                if production_date:
-                    # Try to parse the date and filter
-                    try:
-                        from django.utils.dateparse import parse_date
-                        # Handle both DD-MM-YYYY and YYYY-MM-DD formats
-                        if isinstance(production_date, str):
-                            parts = production_date.split('-')
-                            if len(parts) == 3 and len(parts[0]) == 2:
-                                # DD-MM-YYYY format
-                                parsed_date = parse_date(f'{parts[2]}-{parts[1]}-{parts[0]}')
-                            else:
-                                parsed_date = parse_date(production_date)
+            # Also try site_id from POST data (HQ context)
+            site_id = self.data.get('site')
+            
+            queryset = Batch.objects.all()
+            
+            if current_site:
+                queryset = queryset.filter(site=current_site)
+            elif site_id:
+                queryset = queryset.filter(site_id=site_id)
+            
+            if production_date:
+                try:
+                    from django.utils.dateparse import parse_date
+                    if isinstance(production_date, str):
+                        parts = production_date.split('-')
+                        if len(parts) == 3 and len(parts[0]) == 2:
+                            parsed_date = parse_date(f'{parts[2]}-{parts[1]}-{parts[0]}')
                         else:
-                            parsed_date = production_date
-                            
-                        if parsed_date:
-                            queryset = queryset.filter(production_date=parsed_date)
-                    except:
-                        pass
-                self.fields['batch'].queryset = queryset.order_by('batch_number')
+                            parsed_date = parse_date(production_date)
+                    else:
+                        parsed_date = production_date
+                    
+                    if parsed_date:
+                        queryset = queryset.filter(production_date=parsed_date)
+                except Exception:
+                    pass
+            
+            self.fields['batch'].queryset = queryset.order_by('batch_number')
