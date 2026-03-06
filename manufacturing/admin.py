@@ -918,8 +918,11 @@ class StockUsageReportAdmin(admin.ModelAdmin):
                 if bc.container:
                     item_site = bc.container.site
                 else:
-                    # For batch_ref, get the site from batch
-                    batch = Batch.objects.filter(production_date=bc.production_date, batch_number=bc.batch_ref).first()
+                    # For local items (batch_ref), get site from any batch on this production date
+                    batch_qs = Batch.objects.filter(production_date=bc.production_date)
+                    if site_id:
+                        batch_qs = batch_qs.filter(site_id=site_id)
+                    batch = batch_qs.first()
                     item_site = batch.site if batch else None
                 
                 meat_summary = MeatProductionSummary.objects.filter(

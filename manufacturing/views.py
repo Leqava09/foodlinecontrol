@@ -973,11 +973,17 @@ def production_batch_detail_view(request, site_slug, production_date):
         active_tab = request.POST.get('active_tab', 'cert')
         activetab = active_tab
 
+        # Parse dirty tabs - save ALL tabs that were modified, not just the active one
+        dirty_tabs_str = request.POST.get('dirty_tabs', '')
+        dirty_tabs = set(dirty_tabs_str.split(',')) if dirty_tabs_str else set()
+        dirty_tabs.discard('')  # remove empty strings
+        dirty_tabs.add(active_tab)  # always include the active tab
+
         try:
             with transaction.atomic():
 
                 # CERTIFICATION
-                if active_tab == 'cert':
+                if 'cert' in dirty_tabs:
 
                     # 1) Delete existing NSI docs that were marked with the X
                     delete_ids = request.POST.getlist('delete_nsi_ids[]')
@@ -1041,7 +1047,7 @@ def production_batch_detail_view(request, site_slug, production_date):
 
                     
                 # MEAT (Per-container dynamic save)
-                elif activetab == 'meat':
+                if 'meat' in dirty_tabs:
                     
                     delete_defrost_ids = request.POST.getlist('delete_defrost_ids[]')
                     if delete_defrost_ids:
@@ -1120,165 +1126,166 @@ def production_batch_detail_view(request, site_slug, production_date):
                             continue
                     
                     # Check for duplicates
+                    meat_save_ok = True
                     container_set = set()
                     for item in valid_containers:
                         if item['container_number'] in container_set:
                             messages.error(request, f'❌ Error: Cannot use the same container twice!')
-                            return redirect(f'{request.path}?tab={activetab}')
+                            meat_save_ok = False
+                            break
                         container_set.add(item['container_number'])
                     
-                    # ✅ 2) PRESERVE existing DefrostDocuments before deleting containers
-                    old_containers = BatchContainer.objects.filter(production_date=batch.production_date)
-                    preserved_defrost = {}  # key: container_number, value: list of file paths
+                    if meat_save_ok:
+                        # ✅ 2) PRESERVE existing DefrostDocuments before deleting containers
+                        old_containers = BatchContainer.objects.filter(production_date=batch.production_date)
+                        preserved_defrost = {}  # key: container_number, value: list of file paths
+                        
+                        # ✅ CAPTURE OLD container values for change detection
+                        old_container_data = {}
+                        for old_bc in old_containers:
+                            key = old_bc.container.container_number if old_bc.container else old_bc.batch_ref
+                            if key:
+                                old_container_data[key] = {
+                                    'stock_left': float(old_bc.stock_left) if old_bc.stock_left else 0,
+                                    'book_out_qty': float(old_bc.book_out_qty) if old_bc.book_out_qty else 0,
+                                    'kg_used': float(old_bc.kg_frozen_meat_used) if old_bc.kg_frozen_meat_used else 0,
+                                }
+                                docs = old_bc.defrost_documents.all()
+                                if docs.exists():
+                                    preserved_defrost[key] = [doc.file for doc in docs]
                     
-                    # ✅ CAPTURE OLD container values for change detection
-                    old_container_data = {}
-                    for old_bc in old_containers:
-                        key = old_bc.container.container_number if old_bc.container else old_bc.batch_ref
-                        if key:
-                            old_container_data[key] = {
-                                'stock_left': float(old_bc.stock_left) if old_bc.stock_left else 0,
-                                'book_out_qty': float(old_bc.book_out_qty) if old_bc.book_out_qty else 0,
-                                'kg_used': float(old_bc.kg_frozen_meat_used) if old_bc.kg_frozen_meat_used else 0,
-                            }
-                            docs = old_bc.defrost_documents.all()
-                            if docs.exists():
-                                preserved_defrost[key] = [doc.file for doc in docs]
                     
-                    
-                    # ✅ 3) NOW delete old containers (cascade-deletes DefrostDocuments)
-                    BatchContainer.objects.filter(production_date=batch.production_date).delete()
-                    
-                    # ✅ 4) CREATE new containers and restore + add defrost docs
-                    created_count = 0
-                    
-                    for idx, item in enumerate(valid_containers):
-                        try:
-                            if item['source_type'] == 'local':
-                                bc = BatchContainer.objects.create(
-                                    production_date=batch.production_date,
-                                    container=None,
-                                    batch_ref=item['container_number'],
-                                    balance_from_prev_shift=Decimal(str(item['balance_from_prev_shift'])),
-                                    kg_frozen_meat_used=Decimal(str(item['kg_used'])),
-                                    meat_filled=Decimal(str(item['filled'])),
-                                    container_waste=Decimal(str(item['waste'])),
-                                    waste_factor=Decimal(str(item['waste_factor'])),
-                                    book_out_qty=Decimal(str(item['book_out_qty'])),
-                                    stock_left=Decimal(str(item['stock_left'])),
-                                    source_type='local',
-                                )
-                            else:
-                                # ✅ Get container filtered by site
-                                container_qs = Container.objects.filter(container_number=item['container_number'])
-                                if current_site:
-                                    container_qs = container_qs.filter(site=current_site)
-                                container = container_qs.first()
-                                if not container:
-                                    continue  # Skip if container not found or not in current site
-                                
-                                bc = BatchContainer.objects.create(
-                                    production_date=batch.production_date,
-                                    container=container,
-                                    balance_from_prev_shift=Decimal(str(item['balance_from_prev_shift'])),
-                                    kg_frozen_meat_used=Decimal(str(item['kg_used'])),
-                                    meat_filled=Decimal(str(item['filled'])),
-                                    container_waste=Decimal(str(item['waste'])),
-                                    waste_factor=Decimal(str(item['waste_factor'])),
-                                    book_out_qty=Decimal(str(item['book_out_qty'])),
-                                    stock_left=Decimal(str(item['stock_left'])),
-                                    batch_ref=None,
-                                    source_type='import',
-                                )
-                            
-                            created_count += 1
-                            
-                            # ✅ LOG CONTAINER CHANGES (only if stock_left changed)
-                            container_key = item['container_number']
-                            old_data = old_container_data.get(container_key, {})
-                            new_stock_left = item['stock_left']
-                            old_stock_left = old_data.get('stock_left', 0)
-                            
-                            if normalize_value(old_stock_left) != normalize_value(new_stock_left):
-                                if old_stock_left:
-                                    log_change(request.user, production, f"{container_key}: stock_left: {old_stock_left}kg → {new_stock_left}kg")
+                        # ✅ 3) NOW delete old containers (cascade-deletes DefrostDocuments)
+                        BatchContainer.objects.filter(production_date=batch.production_date).delete()
+                        
+                        # ✅ 4) CREATE new containers and restore + add defrost docs
+                        created_count = 0
+                        
+                        for idx, item in enumerate(valid_containers):
+                            try:
+                                if item['source_type'] == 'local':
+                                    bc = BatchContainer.objects.create(
+                                        production_date=batch.production_date,
+                                        container=None,
+                                        batch_ref=item['container_number'],
+                                        balance_from_prev_shift=Decimal(str(item['balance_from_prev_shift'])),
+                                        kg_frozen_meat_used=Decimal(str(item['kg_used'])),
+                                        meat_filled=Decimal(str(item['filled'])),
+                                        container_waste=Decimal(str(item['waste'])),
+                                        waste_factor=Decimal(str(item['waste_factor'])),
+                                        book_out_qty=Decimal(str(item['book_out_qty'])),
+                                        stock_left=Decimal(str(item['stock_left'])),
+                                        source_type='local',
+                                    )
                                 else:
-                                    log_change(request.user, production, f"{container_key}: stock_left: {new_stock_left}kg")
-                            
-                            # Log restored defrost docs
-                            if container_key in preserved_defrost:
-                                for old_file in preserved_defrost[container_key]:
-                                    DefrostDocument.objects.create(batch_container=bc, file=old_file)
-                            
-                            # Log new defrost uploads
-                            defrost_key = f'defrost_sheet_{idx}[]'
-                            # ✅ Allow container creation to fail silently if container not found or not in current site
-                            new_files = request.FILES.getlist(defrost_key)
-                            for f in new_files:
-                                DefrostDocument.objects.create(batch_container=bc, file=f)
-                                log_change(request.user, production, f"{container_key}: Defrost sheet → {f.name}")
+                                    # ✅ Get container filtered by site
+                                    container_qs = Container.objects.filter(container_number=item['container_number'])
+                                    if current_site:
+                                        container_qs = container_qs.filter(site=current_site)
+                                    container = container_qs.first()
+                                    if not container:
+                                        continue  # Skip if container not found or not in current site
+                                    
+                                    bc = BatchContainer.objects.create(
+                                        production_date=batch.production_date,
+                                        container=container,
+                                        balance_from_prev_shift=Decimal(str(item['balance_from_prev_shift'])),
+                                        kg_frozen_meat_used=Decimal(str(item['kg_used'])),
+                                        meat_filled=Decimal(str(item['filled'])),
+                                        container_waste=Decimal(str(item['waste'])),
+                                        waste_factor=Decimal(str(item['waste_factor'])),
+                                        book_out_qty=Decimal(str(item['book_out_qty'])),
+                                        stock_left=Decimal(str(item['stock_left'])),
+                                        batch_ref=None,
+                                        source_type='import',
+                                    )
+                                
+                                created_count += 1
+                                
+                                # ✅ LOG CONTAINER CHANGES (only if stock_left changed)
+                                container_key = item['container_number']
+                                old_data = old_container_data.get(container_key, {})
+                                new_stock_left = item['stock_left']
+                                old_stock_left = old_data.get('stock_left', 0)
+                                
+                                if normalize_value(old_stock_left) != normalize_value(new_stock_left):
+                                    if old_stock_left:
+                                        log_change(request.user, production, f"{container_key}: stock_left: {old_stock_left}kg → {new_stock_left}kg")
+                                    else:
+                                        log_change(request.user, production, f"{container_key}: stock_left: {new_stock_left}kg")
+                                
+                                # Log restored defrost docs
+                                if container_key in preserved_defrost:
+                                    for old_file in preserved_defrost[container_key]:
+                                        DefrostDocument.objects.create(batch_container=bc, file=old_file)
+                                
+                                # Log new defrost uploads
+                                defrost_key = f'defrost_sheet_{idx}[]'
+                                # ✅ Allow container creation to fail silently if container not found or not in current site
+                                new_files = request.FILES.getlist(defrost_key)
+                                for f in new_files:
+                                    DefrostDocument.objects.create(batch_container=bc, file=f)
+                                    log_change(request.user, production, f"{container_key}: Defrost sheet → {f.name}")
 
-                        except Container.DoesNotExist:
-                            continue
+                            except Container.DoesNotExist:
+                                continue
+                            except Exception as e:
+                                import traceback
+                                traceback.print_exc()
+                                continue
+                        
+                        if created_count > 0:
+                            messages.success(request, f'✅ Saved {created_count} containers!')
+                        else:
+                            messages.warning(request, '⚠️ No valid containers to save')
+                        
+                        # ✅ MEAT SUMMARY
+                        try:
+                            total_meat_filled_str = request.POST.get('total_meat_filled', '').strip()
+                            total_waste_str = request.POST.get('total_waste', '0').strip()
+                            filling_weight_str = request.POST.get('filling_weight_per_pouch', '').strip()
+                            
+                            if not total_meat_filled_str or float(total_meat_filled_str) == 0:
+                                messages.error(request, '❌ Total Meat Filled is REQUIRED!')
+                            else:
+                                meat_summary, _ = MeatProductionSummary.objects.get_or_create(
+                                    production_date=batch.production_date,
+                                    site=current_site
+                                )
+                                # Capture OLD values
+                                old_meat = {
+                                    'total_filled': f"{meat_summary.total_meat_filled}kg" if meat_summary.total_meat_filled else '',
+                                    'total_waste': f"{meat_summary.total_waste}kg" if meat_summary.total_waste else '',
+                                    'filling_weight': f"{meat_summary.filling_weight_per_pouch}kg/pouch" if meat_summary.filling_weight_per_pouch else '',
+                                }
+                                
+                                meat_summary.total_meat_filled = Decimal(total_meat_filled_str)
+                                meat_summary.total_waste = Decimal(total_waste_str) if total_waste_str else Decimal('0')
+                                
+                                if filling_weight_str:
+                                    meat_summary.filling_weight_per_pouch = Decimal(filling_weight_str)
+                                
+                                if 'filling_weight_sheet' in request.FILES:
+                                    meat_summary.filling_weight_sheet = request.FILES['filling_weight_sheet']
+                                    log_change(request.user, production, f"Meat summary: Filling weight sheet uploaded")
+                                
+                                meat_summary.save()
+                                
+                                # Log only changes
+                                new_meat = {
+                                    'total_filled': f"{meat_summary.total_meat_filled}kg",
+                                    'total_waste': f"{meat_summary.total_waste}kg",
+                                    'filling_weight': f"{meat_summary.filling_weight_per_pouch}kg/pouch" if meat_summary.filling_weight_per_pouch else '',
+                                }
+                                log_model_changes(request.user, production, "Meat summary", old_meat, new_meat)
+                                
+                                messages.success(request, '✅ Meat Summary saved!')
+                            
                         except Exception as e:
-                            import traceback
-                            traceback.print_exc()
-                            continue
-                    
-                    if created_count > 0:
-                        messages.success(request, f'✅ Saved {created_count} containers!')
-                    else:
-                        messages.warning(request, '⚠️ No valid containers to save')
-                    
-                    # ✅ MEAT SUMMARY (unchanged)
-                    try:
-                        total_meat_filled_str = request.POST.get('total_meat_filled', '').strip()
-                        total_waste_str = request.POST.get('total_waste', '0').strip()
-                        filling_weight_str = request.POST.get('filling_weight_per_pouch', '').strip()
-                        
-                        if not total_meat_filled_str or float(total_meat_filled_str) == 0:
-                            messages.error(request, '❌ Total Meat Filled is REQUIRED!')
-                            return redirect(f"{request.path}?tab=meat")
-                        
-                        meat_summary, _ = MeatProductionSummary.objects.get_or_create(
-                            production_date=batch.production_date,
-                            site=current_site
-                        )
-                        # Capture OLD values
-                        old_meat = {
-                            'total_filled': f"{meat_summary.total_meat_filled}kg" if meat_summary.total_meat_filled else '',
-                            'total_waste': f"{meat_summary.total_waste}kg" if meat_summary.total_waste else '',
-                            'filling_weight': f"{meat_summary.filling_weight_per_pouch}kg/pouch" if meat_summary.filling_weight_per_pouch else '',
-                        }
-                        
-                        meat_summary.total_meat_filled = Decimal(total_meat_filled_str)
-                        meat_summary.total_waste = Decimal(total_waste_str) if total_waste_str else Decimal('0')
-                        
-                        if filling_weight_str:
-                            meat_summary.filling_weight_per_pouch = Decimal(filling_weight_str)
-                        
-                        if 'filling_weight_sheet' in request.FILES:
-                            meat_summary.filling_weight_sheet = request.FILES['filling_weight_sheet']
-                            log_change(request.user, production, f"Meat summary: Filling weight sheet uploaded")
-                        
-                        meat_summary.save()
-                        
-                        # Log only changes
-                        new_meat = {
-                            'total_filled': f"{meat_summary.total_meat_filled}kg",
-                            'total_waste': f"{meat_summary.total_waste}kg",
-                            'filling_weight': f"{meat_summary.filling_weight_per_pouch}kg/pouch" if meat_summary.filling_weight_per_pouch else '',
-                        }
-                        log_model_changes(request.user, production, "Meat summary", old_meat, new_meat)
-                        
-                        messages.success(request, '✅ Meat Summary saved!')
-                        return redirect(f"{request.path}?tab={active_tab}")
-                        
-                    except Exception as e:
-                        messages.error(request, f'❌ Error: {e}')
+                            messages.error(request, f'❌ Error: {e}')
                 
                 # Sauce Tab
-                elif active_tab == 'sauce':
+                if 'sauce' in dirty_tabs:
                     
                     
                     # ✅ PART 1: SAVE RECIPE STOCK ITEM BALANCES (LEFT CARDS)
@@ -1459,10 +1466,9 @@ def production_batch_detail_view(request, site_slug, production_date):
                     log_model_changes(request.user, production, "Sauce summary", old_sauce, new_sauce)
                     
                     messages.success(request, '✅ Sauce data saved!')
-                    return redirect(f"{request.path}?tab={active_tab}")
 
                 # PRODUCT
-                elif active_tab == 'product':
+                if 'product' in dirty_tabs:
                     usage_items = get_product_usage_data(batch)
                     inventory_batch_refs = {}  # ✅ Collect inventory batch refs
                     
@@ -1595,7 +1601,7 @@ def production_batch_detail_view(request, site_slug, production_date):
                     messages.success(request, f'✅ Product usage saved! Created {created_count} Stock Transactions.')
 
                 # DOWN TIME
-                elif active_tab == 'downtime':
+                if 'downtime' in dirty_tabs:
                     pouch_waste, _ = Waste.objects.get_or_create(
                         batch=batch,
                         defaults={'production_date': batch.production_date}
@@ -1620,7 +1626,7 @@ def production_batch_detail_view(request, site_slug, production_date):
                     messages.success(request, '✅ Down Time data saved!')
                 
                 # Packaging
-                elif active_tab == 'packaging':
+                if 'packaging' in dirty_tabs:
                     
                     # Use dynamic packaging_category instead of hardcoded 'Packing'
                     if packaging_category:
@@ -1768,10 +1774,9 @@ def production_batch_detail_view(request, site_slug, production_date):
                     pouch_waste.inventory_book_out_documents = inventory_docs
                     pouch_waste.save()
                     messages.success(request, '✅ Packaging data saved!')
-                    return redirect(f"{request.path}?tab={active_tab}")
 
                 # ===== SAVE PRODUCTION SUMMARY TAB =====
-                elif active_tab == 'summary':
+                if 'summary' in dirty_tabs:
                     from manufacturing.models import ProductionSummaryItem, BatchComponentSnapshot
                     
                     # ✅ USE MAIN PRODUCTION QTY (Shift Totals), NOT JS 23916
@@ -1899,7 +1904,7 @@ def production_batch_detail_view(request, site_slug, production_date):
 
                                         
                 # POUCH
-                elif active_tab == 'processing':
+                if 'processing' in dirty_tabs:
                     pouch_waste, _ = Waste.objects.get_or_create(
                         batch=batch,
                         defaults={'production_date': batch.production_date}
@@ -2578,6 +2583,7 @@ def production_batch_detail_view(request, site_slug, production_date):
         <form id="mainform" method="post" enctype="multipart/form-data">
             <input type="hidden" name="csrfmiddlewaretoken" value="{csrf_token}">
             <input type="hidden" name="active_tab" id="active_tab_input" value="cert">
+            <input type="hidden" name="dirty_tabs" id="dirty_tabs_input" value="">
             
             <!-- TOP BUTTONS WITH HISTORY -->
             <div class="button-bar" style="position: relative; padding-right: 150px;">

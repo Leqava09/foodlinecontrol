@@ -6,6 +6,7 @@
 
 // ========== CHANGE LOG TRACKING ==========
 window.CHANGE_LOG = [];
+window.DIRTY_TABS = new Set();
 
 document.addEventListener('DOMContentLoaded', function () {
   const form = document.getElementById('mainform');
@@ -46,6 +47,12 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         e.target.dataset.oldValue = newValue;
+
+        // Track which tab was modified
+        const tabContainer = e.target.closest('.tab-content');
+        if (tabContainer && tabContainer.id) {
+          window.DIRTY_TABS.add(tabContainer.id);
+        }
       }
     }, true); // capture
   });
@@ -224,6 +231,13 @@ document.addEventListener('DOMContentLoaded', function() {
 	  if (btnSaveExit) {
 		  btnSaveExit.addEventListener('click', function(e) {
 			  saveActionInput.value = 'saveexit'
+			  // Populate dirty_tabs before submit
+			  const dirtyTabsInput = document.getElementById('dirty_tabs_input');
+			  const activeTabInput = document.getElementById('active_tab_input');
+			  if (dirtyTabsInput && activeTabInput) {
+				  window.DIRTY_TABS.add(activeTabInput.value);
+				  dirtyTabsInput.value = Array.from(window.DIRTY_TABS).join(',');
+			  }
 			  // Submit via fetch instead of direct form.submit()
 			  e.preventDefault()
 			  const formData = new FormData(mainForm)
@@ -248,6 +262,13 @@ document.addEventListener('DOMContentLoaded', function() {
 	  if (btnSave) {
 		  btnSave.addEventListener('click', function(e) {
 			  saveActionInput.value = 'save'
+			  // Populate dirty_tabs before submit
+			  const dirtyTabsInput = document.getElementById('dirty_tabs_input');
+			  const activeTabInput = document.getElementById('active_tab_input');
+			  if (dirtyTabsInput && activeTabInput) {
+				  window.DIRTY_TABS.add(activeTabInput.value);
+				  dirtyTabsInput.value = Array.from(window.DIRTY_TABS).join(',');
+			  }
 			  mainForm.submit()  // ← Regular submit, stays on page
 		  })
 	  }
@@ -278,6 +299,13 @@ document.addEventListener('DOMContentLoaded', function() {
               const activeTabInput = document.getElementById('active_tab_input');
               if (activeTabInput) {
                   activeTabInput.value = activeTab;
+              }
+
+              // Populate dirty_tabs before submit
+              const dirtyTabsInput = document.getElementById('dirty_tabs_input');
+              if (dirtyTabsInput) {
+                  window.DIRTY_TABS.add(activeTab);
+                  dirtyTabsInput.value = Array.from(window.DIRTY_TABS).join(',');
               }
 
               mainForm.submit();
@@ -2776,7 +2804,7 @@ window.addContainerCard = function() {
       <input type="number" 
              name="book_out_qty[]" 
              value="0" 
-             onchange="calculateDefrostedFresh(this); calculateWasteDefrostFilling();"
+             onchange="calculateDefrostedFresh(this); calculateWasteDefrostFilling(); calculateWasteDefrostPouch();"
              class="book-out-qty-input"
              style="width: 100%; padding: 6px; background: #ffffcc; font-weight: bold; text-align: center; border: 1px solid #ccc; border-radius: 3px;">
     </div>
@@ -2788,7 +2816,7 @@ window.addContainerCard = function() {
              name="stock_left[]" 
              value="0" 
              step="0.01" 
-             onchange="calculateDefrostedFresh(this); calculateWasteDefrostFilling();"
+             onchange="calculateDefrostedFresh(this); calculateWasteDefrostFilling(); calculateWasteDefrostPouch();"
              style="width: 100%; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 3px; box-sizing: border-box;">
     </div>
 	
@@ -3029,25 +3057,33 @@ window.removeContainerCard = function(button) {
 };
 
 // ✅ CALCULATE WASTE DEFROST POUCH
+// ✅ CALCULATE WASTE DEFROST POUCH ACTUAL
+// Uses shift totals and filling weight to calculate % Loss from Frozen/Raw - Pouch Actual
 window.calculateWasteDefrostPouch = function() {
   try {
-    const cards = document.querySelectorAll('.container-card');
-    let totalWaste = 0;
+    let totalShiftQty = 0;
+    if (window.BATCH_DATA && window.BATCH_DATA.all_batches) {
+      window.BATCH_DATA.all_batches.forEach(batch => {
+        totalShiftQty += parseFloat(batch.shift_total) || 0;
+      });
+    }
     
-    cards.forEach(card => {
-      const wasteInput = card.querySelector('input[name="waste_factor_pouch[]"]');
-      const defrostedInput = card.querySelector('input[name="kg_frozen_meat_used[]"]');
-      
-      if (wasteInput && defrostedInput) {
-        const waste = (parseFloat(wasteInput.value || 0) / 100) * parseFloat(defrostedInput.value || 0);
-        totalWaste += isNaN(waste) ? 0 : waste;
-      }
+    let totalFrozenFresh = 0;
+    document.querySelectorAll('input[name="kg_frozen_meat_used[]"]').forEach(input => {
+      totalFrozenFresh += parseFloat(input.value) || 0;
     });
     
-    const summaryInput = document.querySelector('input[name="total_waste"]');
-    if (summaryInput) {
-      summaryInput.value = totalWaste.toFixed(2);
+    const fillingWeight = parseFloat(document.querySelector('input[name="filling_weight_per_pouch"]')?.value) || 0;
+    const expectedOutput = totalShiftQty * fillingWeight;
+    
+    let pouchActualLoss = 0;
+    if (totalFrozenFresh > 0) {
+      pouchActualLoss = ((totalFrozenFresh - expectedOutput) / totalFrozenFresh) * 100;
     }
+    
+    document.querySelectorAll('input[name="waste_factor_pouch[]"]').forEach(input => {
+      input.value = pouchActualLoss.toFixed(2);
+    });
     
   } catch (e) {
 
@@ -3055,23 +3091,30 @@ window.calculateWasteDefrostPouch = function() {
 };
 
 // ✅ CALCULATE WASTE DEFROST FILLING
+// Sums kg_frozen_meat_used from all container cards, then calculates % Loss from Frozen/Raw - Filling
 window.calculateWasteDefrostFilling = function() {
   try {
     const cards = document.querySelectorAll('.container-card');
-    let totalMeatFilled = 0;
+    let totalDefrosted = 0;
     
     cards.forEach(card => {
       const defrostedInput = card.querySelector('input[name="kg_frozen_meat_used[]"]');
       if (defrostedInput) {
         const defrosted = parseFloat(defrostedInput.value || 0);
-        totalMeatFilled += isNaN(defrosted) ? 0 : defrosted;
+        totalDefrosted += isNaN(defrosted) ? 0 : defrosted;
       }
     });
     
-    const summaryInput = document.querySelector('input[name="total_meat_filled"]');
-    if (summaryInput) {
-      summaryInput.value = totalMeatFilled.toFixed(2);
-    }
+    // Calculate % Loss = (totalDefrosted - totalMeatFilled) / totalDefrosted * 100
+    const totalMeatFilledInput = document.querySelector('input[name="total_meat_filled"]');
+    const totalMeatFilled = parseFloat(totalMeatFilledInput ? totalMeatFilledInput.value : 0) || 0;
+    
+    const wasteFillPercentage = totalDefrosted > 0 ? ((totalDefrosted - totalMeatFilled) / totalDefrosted) * 100 : 0;
+    
+    const wasteFillingInputs = document.querySelectorAll('input[name="waste_factor[]"]');
+    wasteFillingInputs.forEach(input => {
+      input.value = wasteFillPercentage.toFixed(2);
+    });
     
   } catch (e) {
 
@@ -3628,50 +3671,9 @@ window.currentMeatSource = 'import';
 /* CALCULATION FUNCTIONS */
 /* ============================================================ */
 
-window.calculateWasteDefrostFilling = function() {
-  const defrostedInputs = document.querySelectorAll('input[name="kg_frozen_meat_used[]"]');
-  let totalDefrosted = 0;
-  defrostedInputs.forEach(input => {
-    totalDefrosted += parseFloat(input.value) || 0;
-  });
-  
-  const totalMeatFilledInput = document.querySelector('input[name="total_meat_filled"]');
-  const totalMeatFilled = parseFloat(totalMeatFilledInput ? totalMeatFilledInput.value : 0) || 0;
-  
-  const wasteFillPercentage = totalDefrosted > 0 ? ((totalDefrosted - totalMeatFilled) / totalDefrosted) * 100 : 0;
-  
-  const wasteFillingInputs = document.querySelectorAll('input[name="waste_factor[]"]');
-  wasteFillingInputs.forEach(input => {
-    input.value = wasteFillPercentage.toFixed(2);
-  });
-  
-};
+// (calculateWasteDefrostFilling defined above in the main calculation section)
 
-window.calculateWasteDefrostPouch = function() {
-  let totalShiftQty = 0;
-  if (window.BATCH_DATA && window.BATCH_DATA.all_batches) {
-    window.BATCH_DATA.all_batches.forEach(batch => {
-      totalShiftQty += parseFloat(batch.shift_total) || 0;
-    });
-  }
-  
-  let totalFrozenFresh = 0;
-  document.querySelectorAll('input[name="kg_frozen_meat_used[]"]').forEach(input => {
-    totalFrozenFresh += parseFloat(input.value) || 0;
-  });
-  
-  const fillingWeight = parseFloat(document.querySelector('input[name="filling_weight_per_pouch"]')?.value) || 0;
-  const expectedOutput = totalShiftQty * fillingWeight;
-  
-  let pouchActualLoss = 0;
-  if (totalFrozenFresh > 0) {
-    pouchActualLoss = ((totalFrozenFresh - expectedOutput) / totalFrozenFresh) * 100;
-  }
-  
-  document.querySelectorAll('input[name="waste_factor_pouch[]"]').forEach(input => {
-    input.value = pouchActualLoss.toFixed(2);
-  });
-};
+// (calculateWasteDefrostPouch defined above in the main calculation section)
 
 window.calculateMachineTotal = function() {
   const fields = ['seal_creeps', 'unsealed_poor_seal', 'screwed_and_undated', 'over_weight', 'under_weight', 'empty_pouches', 'metal_detection'];
