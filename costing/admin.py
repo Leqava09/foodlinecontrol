@@ -532,7 +532,7 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     
     list_filter = ['date_created', 'production_date']
 
-    ordering = ('-date_created',)
+    ordering = ('production_date__production_date',)
     
     # ============= BATCH APPROVALS DISPLAY =============
     
