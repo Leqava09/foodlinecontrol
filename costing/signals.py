@@ -381,7 +381,7 @@ def create_hq_transport_on_dispatched(sender, instance, created, **kwargs):
         except BillingDocumentHeader.DoesNotExist:
             return
         
-        print(f"🔔 HQ Transport Signal: Billing {billing.base_number}, dispatched={billing.dispatched}")
+        print(f"[INFO] HQ Transport Signal: Billing {billing.base_number}, dispatched={billing.dispatched}")
         
         from transport.models import TransportLoad
         from costing.models import BatchCosting, BatchPriceApproval
@@ -389,10 +389,10 @@ def create_hq_transport_on_dispatched(sender, instance, created, **kwargs):
         # If dispatched is FALSE, remove TransportLoad
         if not dispatched_status:
             deleted_count = TransportLoad.objects.filter(billing_document=billing).delete()[0]
-            print(f"❌ Removed {deleted_count} transport loads for billing {billing.base_number}")
+            print(f"[INFO] Removed {deleted_count} transport loads for billing {billing.base_number}")
             return
         
-        print(f"✅ Creating transport load for billing {billing.base_number}...")
+        print(f"[OK] Creating transport load for billing {billing.base_number}...")
         
         # Build batch_data based on billing type
         batch_data = []
@@ -535,13 +535,13 @@ def create_hq_transport_on_dispatched(sender, instance, created, **kwargs):
                     if site_transport:
                         transport_load.import_source_load_number = site_transport.load_number
                         transport_load.save(update_fields=['import_source_load_number'])
-                        print(f"📍 Linked to site transport: {billing.import_source_site.name} Load {site_transport.load_number}")
+                        print(f"[INFO] Linked to site transport: {billing.import_source_site.name} Load {site_transport.load_number}")
                 except Exception as e:
-                    print(f"⚠️ Could not find site transport: {e}")
+                    print(f"[WARN] Could not find site transport: {e}")
             
-            print(f"✅ Created HQ transport load {load_number} for billing {billing.base_number}")
+            print(f"[OK] Created HQ transport load {load_number} for billing {billing.base_number}")
         else:
-            print(f"🔄 Updating existing transport load for billing {billing.base_number}")
+            print(f"[INFO] Updating existing transport load for billing {billing.base_number}")
             transport_load.billing_date = billing.billing_date
             transport_load.released_date = billing.billing_date
             transport_load.date_loaded = billing.billing_date
@@ -577,7 +577,7 @@ def create_hq_transport_on_dispatched(sender, instance, created, **kwargs):
                 "import_source_site",
                 "import_source_load_number",
             ])
-            print(f"✅ Updated transport load {transport_load.load_number} for billing {billing.base_number}")
+            print(f"[OK] Updated transport load {transport_load.load_number} for billing {billing.base_number}")
     
     # Use transaction.on_commit to defer transport creation until billing is committed
     transaction.on_commit(process_transport)

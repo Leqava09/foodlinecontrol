@@ -150,11 +150,11 @@ class ImportTransportForm(forms.ModelForm):
                     instance.other_documents = site_load.other_documents
                     
                     instance.save()
-                    print(f"✅ Copied transport load data from site {import_site.name} load {import_load} to HQ load {hq_load}")
+                    print(f"[OK] Copied transport load data from site {import_site.name} load {import_load} to HQ load {hq_load}")
                 except TransportLoad.DoesNotExist:
-                    print(f"❌ ERROR: Could not find load {import_load} in site {import_site.name}")
+                    print(f"[ERROR] Could not find load {import_load} in site {import_site.name}")
                 except Exception as e:
-                    print(f"❌ ERROR copying transport load data: {e}")
+                    print(f"[ERROR] copying transport load data: {e}")
         
         return instance
 

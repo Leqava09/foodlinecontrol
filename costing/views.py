@@ -225,7 +225,7 @@ def batch_summary_items_api(request, production_date_str):
     if not prod_date:
         return JsonResponse({'error': 'Could not determine production date'}, status=400)
     
-    print(f"🔵 batch_summary_items_api: production_date={prod_date}, site={current_site}")
+    print(f"[INFO] batch_summary_items_api: production_date={prod_date}, site={current_site}")
     
     # ✅ Filter Batch by production_date AND site
     batch_qs = Batch.objects.filter(production_date=prod_date)
@@ -762,7 +762,7 @@ def batch_summary_items_api(request, production_date_str):
     total_batch_units = float(total_pouches)  # NOT the Pouch Gravy used qty!
 
     # ==================== RETURN RESPONSE ====================
-    print(f"   ✅ Returning {len(items)} summary items to frontend")
+    print(f"   [OK] Returning {len(items)} summary items to frontend")
     for section in ['meat', 'sauce', 'packaging']:
         count = len([i for i in items if i['section'] == section])
         if count > 0:
@@ -852,7 +852,7 @@ def update_batch_price_approval(request, pk):
     Called from batch_price_approval_save.js
     """
     
-    print(f"🔵 update_batch_price_approval called: pk={pk}, user={request.user}")
+    print(f"[INFO] update_batch_price_approval called: pk={pk}, user={request.user}")
     
     try:
         approval = get_object_or_404(BatchPriceApproval, pk=pk)
@@ -869,21 +869,21 @@ def update_batch_price_approval(request, pk):
                 approval.batch_price_per_unit = Decimal(price_clean)
                 print(f"   Set price to: {approval.batch_price_per_unit}")
             except Exception as e:
-                print(f"   ❌ Price parse error: {e}")
+                print(f"   [ERROR] Price parse error: {e}")
                 return JsonResponse({'ok': False, 'error': f'Invalid price: {str(e)}'}, status=400)
 
         approval.is_approved = is_approved_str == 'true'
         print(f"   Set approved to: {approval.is_approved}")
 
         approval.save()
-        print(f"   ✅ Saved approval to database")
+        print(f"   [OK] Saved approval to database")
 
         # Return minimal response immediately (avoids timeout/broken pipe)
         return JsonResponse({'ok': True})
         
     except Exception as e:
         import traceback
-        print(f"   ❌ Exception: {e}")
+        print(f"   [ERROR] Exception: {e}")
         traceback.print_exc()
         return JsonResponse({'ok': False, 'error': str(e)}, status=400)
 
@@ -1290,14 +1290,14 @@ def billing_document_preview(request, pk, doc_type):
                 if source_batch_costings.exists():
                     # Copy batch_costings to this header for future use
                     header.batch_costings.set(source_batch_costings)
-                    print(f"✅ Copied {source_batch_costings.count()} batch_costings from source invoice")
+                    print(f"[OK] Copied {source_batch_costings.count()} batch_costings from source invoice")
                     
                     # Copy qty_for_invoice_data from source if HQ header doesn't have it
                     source_qty_data = source_invoice.qty_for_invoice_data or {}
                     if not header.qty_for_invoice_data and source_qty_data:
                         header.qty_for_invoice_data = source_qty_data
                         header.save(update_fields=['qty_for_invoice_data'])
-                        print(f"✅ Copied qty_for_invoice_data from source invoice")
+                        print(f"[OK] Copied qty_for_invoice_data from source invoice")
                     
                     # Use the source invoice's qty data for processing
                     raw_qty_data = header.qty_for_invoice_data or source_qty_data

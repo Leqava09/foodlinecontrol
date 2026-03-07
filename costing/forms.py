@@ -431,19 +431,19 @@ class ImportBillingForm(forms.ModelForm):
                     batch_costings = site_invoice.batch_costings.all()
                     if batch_costings.exists():
                         instance.batch_costings.set(batch_costings)
-                        print(f"✅ Copied {batch_costings.count()} batch_costings from site invoice {import_invoice} to HQ billing {instance.base_number}")
+                        print(f"[OK] Copied {batch_costings.count()} batch_costings from site invoice {import_invoice} to HQ billing {instance.base_number}")
                     else:
-                        print(f"⚠️ WARNING: Site invoice {import_invoice} has no batch_costings!")
+                        print(f"[WARN] Site invoice {import_invoice} has no batch_costings!")
                     
                     # Copy qty_for_invoice_data from source invoice if not already set
                     if not instance.qty_for_invoice_data and site_invoice.qty_for_invoice_data:
                         instance.qty_for_invoice_data = site_invoice.qty_for_invoice_data
                         instance.save(update_fields=['qty_for_invoice_data'])
-                        print(f"✅ Copied qty_for_invoice_data from site invoice")
+                        print(f"[OK] Copied qty_for_invoice_data from site invoice")
                 except BillingDocumentHeader.DoesNotExist:
-                    print(f"❌ ERROR: Could not find site invoice {import_invoice} in site {import_site.name}")
+                    print(f"[ERROR] Could not find site invoice {import_invoice} in site {import_site.name}")
                 except Exception as e:
-                    print(f"❌ ERROR copying batch_costings: {e}")
+                    print(f"[ERROR] copying batch_costings: {e}")
         
         return instance
 
