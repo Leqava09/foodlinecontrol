@@ -6,16 +6,16 @@
     <table>
         <thead>
             <tr>
-                <th style="text-align: center; width: 30px;">
-                    <input type="checkbox" id="action-toggle" onclick="toggleAllCheckboxes(this)">
+                <th class="prod-th-checkbox">
+                    <input type="checkbox" id="action-toggle" title="Select all" onclick="toggleAllCheckboxes(this)">
                 </th>
-                <th style="text-align: center;">Date</th>
-                <th style="text-align: center;">A-NO</th>
-                <th style="text-align: center;">Batch</th>
-                <th style="text-align: center;">Product</th>
-                <th style="text-align: center;">Size</th>
-                <th style="text-align: center;">Shift Total</th>
-                <th style="text-align: center;">Action</th>
+                <th class="prod-th-center">Date</th>
+                <th class="prod-th-center">A-NO</th>
+                <th class="prod-th-center">Batch</th>
+                <th class="prod-th-center">Product</th>
+                <th class="prod-th-center">Size</th>
+                <th class="prod-th-center">Shift Total</th>
+                <th class="prod-th-center">Action</th>
             </tr>
         </thead>
         <tbody>
@@ -25,20 +25,20 @@
                         {% for batch in batches %}
                             <tr>
                                 {% if forloop.first %}
-                                    <td rowspan="{{ batches|length }}" style="vertical-align: middle; padding: 8px; text-align: center; border-right: 1px solid #ccc;">
-                                        <input type="checkbox" name="_selected_action" value="{{ production.pk }}" class="action-select">
+                                    <td rowspan="{{ batches|length }}" class="prod-td-checkbox">
+                                        <input type="checkbox" name="_selected_action" value="{{ production.pk }}" class="action-select" title="Select {{ production.production_date }}">
                                     </td>
-                                    <td rowspan="{{ batches|length }}" style="vertical-align: middle; font-weight: bold; padding: 12px; text-align: center; border-right: 1px solid #ccc;">
+                                    <td rowspan="{{ batches|length }}" class="prod-td-date">
                                         {{ production.production_date|date:"d/m/Y" }}
                                     </td>
                                 {% endif %}
-                                <td style="padding: 8px; border-right: 1px solid #ccc; text-align: center;">{{ batch.a_no }}</td>
-                                <td style="padding: 8px; border-right: 1px solid #ccc; text-align: center;">{{ batch.batch_number }}</td>
-                                <td style="padding: 8px; border-right: 1px solid #ccc; text-align: center;">{{ batch.product.product_name }}</td>
-                                <td style="padding: 8px; border-right: 1px solid #ccc; text-align: center;">{{ batch.size }}</td>
-                                <td style="padding: 8px; border-right: 1px solid #ccc; text-align: center;">{{ batch.shift_total }}</td>
+                                <td class="prod-td-cell">{{ batch.a_no }}</td>
+                                <td class="prod-td-cell">{{ batch.batch_number }}</td>
+                                <td class="prod-td-cell">{{ batch.product.product_name }}</td>
+                                <td class="prod-td-cell">{{ batch.size }}</td>
+                                <td class="prod-td-cell">{{ batch.shift_total }}</td>
                                 {% if forloop.first %}
-                                    <td rowspan="{{ batches|length }}" style="vertical-align: middle; padding: 8px; text-align: center;">
+                                    <td rowspan="{{ batches|length }}" class="prod-td-action">
                                         <a href="{% url 'admin:manufacturing_production_change' production.pk %}" class="grp-button">Edit</a>
                                     </td>
                                 {% endif %}
@@ -47,14 +47,14 @@
                     {% else %}
                         {# Production without batches - still show for selection #}
                         <tr>
-                            <td style="padding: 8px; text-align: center; border-right: 1px solid #ccc;">
-                                <input type="checkbox" name="_selected_action" value="{{ production.pk }}" class="action-select">
+                            <td class="prod-td-cell">
+                                <input type="checkbox" name="_selected_action" value="{{ production.pk }}" class="action-select" title="Select {{ production.production_date }}">
                             </td>
-                            <td style="font-weight: bold; padding: 12px; text-align: center; border-right: 1px solid #ccc;">
+                            <td class="prod-td-date-noborder">
                                 {{ production.production_date|date:"d/m/Y" }}
                             </td>
-                            <td colspan="5" style="padding: 8px; text-align: center; color: #999;">No batches</td>
-                            <td style="padding: 8px; text-align: center;">
+                            <td colspan="5" class="prod-td-empty">No batches</td>
+                            <td class="prod-td-action-noborder">
                                 <a href="{% url 'admin:manufacturing_production_change' production.pk %}" class="grp-button">Edit</a>
                             </td>
                         </tr>
@@ -62,7 +62,7 @@
                 {% endwith %}
             {% empty %}
                 <tr>
-                    <td colspan="8" style="padding: 20px; text-align: center; color: #999;">
+                    <td colspan="8" class="prod-td-empty-full">
                         No production records found.
                     </td>
                 </tr>
@@ -140,6 +140,56 @@
         width: 16px;
         height: 16px;
         cursor: pointer;
+    }
+    .prod-th-checkbox {
+        text-align: center;
+        width: 30px;
+    }
+    .prod-th-center {
+        text-align: center;
+    }
+    .prod-td-checkbox {
+        vertical-align: middle;
+        padding: 8px;
+        text-align: center;
+        border-right: 1px solid #ccc;
+    }
+    .prod-td-date {
+        vertical-align: middle;
+        font-weight: bold;
+        padding: 12px;
+        text-align: center;
+        border-right: 1px solid #ccc;
+    }
+    .prod-td-cell {
+        padding: 8px;
+        border-right: 1px solid #ccc;
+        text-align: center;
+    }
+    .prod-td-action {
+        vertical-align: middle;
+        padding: 8px;
+        text-align: center;
+    }
+    .prod-td-date-noborder {
+        font-weight: bold;
+        padding: 12px;
+        text-align: center;
+        border-right: 1px solid #ccc;
+    }
+    .prod-td-action-noborder {
+        padding: 8px;
+        text-align: center;
+    }
+    .prod-td-empty {
+        padding: 8px;
+        text-align: center;
+        color: #999;
+    }
+    .prod-td-empty-full {
+        padding: 20px;
+        text-align: center;
+        color: #999;
     }
 </style>
 {% endblock %}

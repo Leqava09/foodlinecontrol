@@ -35,6 +35,10 @@ env/
 
 # Media files (uploaded content)
 media/
+# But track company templates (billing/PO doc templates)
+!media/company/
+!media/company/templates/
+!media/company/templates/**
 
 # Static files (collected by Django)
 staticfiles/

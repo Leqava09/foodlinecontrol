@@ -2,7 +2,7 @@
 
 /* ===== REMOVE ALL RIGHT-SIDE MARGINS/PADDING ===== */
 #grp-content {
-    margin-top: 50px !important;
+    margin-top: 60px !important;
     margin-bottom: 10px !important;
     margin-left: 10px !important;
     margin-right: 0px !important;     /* ← ZERO OUT */
@@ -151,7 +151,6 @@ body.change-list {
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
-    min-width: fit-content;
     height: 40px;                  /* Reduced from 44px */
     line-height: 1;
     white-space: nowrap;
