@@ -151,6 +151,7 @@ body.change-list {
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
+    min-width: 140px;
     height: 40px;                  /* Reduced from 44px */
     line-height: 1;
     white-space: nowrap;
