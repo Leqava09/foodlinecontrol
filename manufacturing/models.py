@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.validators import FileExtensionValidator
 from decimal import Decimal
 from smart_selects.db_fields import ChainedForeignKey
 from product_details.models import Product, ProductCategory
@@ -255,7 +256,8 @@ class NSIDocument(models.Model):
     )
     file = models.FileField(
         upload_to='manufacturing/nsi_documents/',
-        verbose_name="NSI Document (PDF)"
+        verbose_name="NSI Document (PDF)",
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'])],
     )
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
@@ -293,8 +295,8 @@ class Waste(models.Model):
     retort_under_weight = models.IntegerField(default=0, verbose_name="Under Weight")
     poor_ceiling_destroyed = models.IntegerField(default=0, verbose_name="Poor Ceiling Destroyed")
     retort_waste_total = models.IntegerField(default=0, verbose_name="Retort Waste Total", editable=False)
-    filling_sheet = models.FileField(upload_to='sheets/', blank=True, null=True, verbose_name="Filling Sheet")
-    retort_sheet = models.FileField(upload_to='sheets/', blank=True, null=True, verbose_name="Retort Sheet")
+    filling_sheet = models.FileField(upload_to='sheets/', blank=True, null=True, verbose_name="Filling Sheet", validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
+    retort_sheet = models.FileField(upload_to='sheets/', blank=True, null=True, verbose_name="Retort Sheet", validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     pouches_withdrawn = models.IntegerField(default=0, verbose_name="Pouches Withdrawn")
     total_returned = models.IntegerField(default=0, verbose_name="Total Returned")
     balance_pouches = models.IntegerField(default=0, verbose_name="Balance Pouches", editable=False)
@@ -304,8 +306,8 @@ class Waste(models.Model):
     pallets_packed = models.IntegerField(default=0, verbose_name="Pallets Packed")
     boxes_packed = models.IntegerField(default=0, verbose_name="Boxes Packed")
     retention_sample_qty = models.IntegerField(default=0, verbose_name="Retention Sample QTY")
-    nsi_sample_log = models.FileField(upload_to='nsi/', blank=True, null=True, verbose_name="NSI Sample Log")
-    final_product_packaging = models.FileField(upload_to='packaging/', blank=True, null=True, verbose_name="Final Product Packaging")
+    nsi_sample_log = models.FileField(upload_to='nsi/', blank=True, null=True, verbose_name="NSI Sample Log", validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
+    final_product_packaging = models.FileField(upload_to='packaging/', blank=True, null=True, verbose_name="Final Product Packaging", validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     total_down_time = models.DecimalField(max_digits=5, decimal_places=2, default=0, verbose_name="Total Down Time (Hours)")
     reasons_for_down_time = models.TextField(blank=True, null=True, verbose_name="Reasons for Down Time")
     
@@ -337,8 +339,8 @@ class Waste(models.Model):
         verbose_name="Inventory Book Out Sheet",
     )
     
-    machine_production_document = models.FileField(upload_to='pouch_docs/', blank=True, null=True, verbose_name="Machine Production Document")
-    retort_control_sheet = models.FileField(upload_to='pouch_docs/', blank=True, null=True, verbose_name="Retort Control Sheet")
+    machine_production_document = models.FileField(upload_to='pouch_docs/', blank=True, null=True, verbose_name="Machine Production Document", validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
+    retort_control_sheet = models.FileField(upload_to='pouch_docs/', blank=True, null=True, verbose_name="Retort Control Sheet", validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     
     class Meta:
         verbose_name = "Pouch Waste"
@@ -384,7 +386,7 @@ class BatchContainer(models.Model):
     waste_factor = models.DecimalField(
         max_digits=5, decimal_places=2, default=0, verbose_name="Waste Factor (%)"
     )
-    defrost_sheet = models.FileField(upload_to='batch_documents/defrost/', null=True, blank=True, verbose_name="Defrost Sheet")
+    defrost_sheet = models.FileField(upload_to='batch_documents/defrost/', null=True, blank=True, verbose_name="Defrost Sheet", validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     batch_ref = models.CharField(max_length=100, null=True, blank=True, verbose_name="Batch Reference")  
     
     book_out_qty = models.DecimalField(
@@ -445,7 +447,8 @@ class DefrostDocument(models.Model):
     )
     file = models.FileField(
         upload_to='manufacturing/defrost_sheets/',
-        verbose_name="Defrost Sheet"
+        verbose_name="Defrost Sheet",
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])],
     )
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
@@ -478,7 +481,7 @@ class MeatWaste(models.Model):
 
 class ProductionDateDocument(models.Model):
     production_date = models.DateField(verbose_name="Production Date")
-    file = models.FileField(upload_to='manufacturing/production_docs/', verbose_name="Production Document")
+    file = models.FileField(upload_to='manufacturing/production_docs/', verbose_name="Production Document", validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -526,7 +529,7 @@ class Sauce(models.Model):
     cancel_opening_balance = models.BooleanField(default=False, verbose_name="Cancel Opening Balance")
     sauce_mixed = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     closing_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    reference_file = models.FileField(upload_to='sauce_references/', null=True, blank=True)  # ADD THIS
+    reference_file = models.FileField(upload_to='sauce_references/', null=True, blank=True, validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])  # ADD THIS
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     recipe_documents = models.JSONField(
@@ -568,7 +571,8 @@ class MeatProductionSummary(models.Model):
     filling_weight_sheet = models.FileField(
         upload_to='batch_documents/filling_weight/',
         null=True, blank=True,
-        verbose_name="Filling Weight Sheet"
+        verbose_name="Filling Weight Sheet",
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])],
     )
     filling_weight_per_pouch = models.DecimalField(
         max_digits=5, decimal_places=3, default=0.277,

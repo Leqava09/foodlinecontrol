@@ -1,5 +1,5 @@
 from django.db import models
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, FileExtensionValidator
 from django.utils import timezone
 from django.conf import settings
 from compliance.models import (
@@ -167,7 +167,7 @@ class Training(models.Model):
 
     training_provided = models.CharField(max_length=200)
     trainer = models.CharField(max_length=100, blank=True)
-    document = models.FileField(upload_to='training_docs/', blank=True)
+    document = models.FileField(upload_to='training_docs/', blank=True, validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     notes = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -236,7 +236,7 @@ class Induction(models.Model):
         verbose_name="SOP Document",
     )
 
-    document = models.FileField(upload_to='induction_docs/', blank=True)
+    document = models.FileField(upload_to='induction_docs/', blank=True, validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     notes = models.TextField(blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
@@ -278,7 +278,7 @@ class Leave(models.Model):
     reason = models.CharField(max_length=80, blank=True)
     approved_by = models.CharField(max_length=50, blank=True)
     approval_date = models.DateField(blank=True, null=True)
-    document = models.FileField(upload_to='leave_docs/', blank=True)
+    document = models.FileField(upload_to='leave_docs/', blank=True, validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'])])
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     
     created_at = models.DateTimeField(auto_now_add=True)

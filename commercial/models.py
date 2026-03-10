@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.validators import FileExtensionValidator
 from inventory.models import StockCategory
 from smart_selects.db_fields import ChainedForeignKey
 from django.db import models
@@ -244,14 +245,16 @@ class CompanyDetails(models.Model):   # <<< rename from Companydetails
         upload_to="company/logo/",
         blank=True,
         null=True,
-        help_text="Logo used on invoices/quotes."
+        help_text="Logo used on invoices/quotes.",
+        validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'webp'])],
     )
 
     billing_template = models.FileField(
         upload_to="company/templates/billing/",
         blank=True,
         null=True,
-        help_text="Single billing template used for invoice/quote/proforma."
+        help_text="Single billing template used for invoice/quote/proforma.",
+        validators=[FileExtensionValidator(allowed_extensions=['doc', 'docx', 'pdf'])],
     )
     
     po_template = models.FileField(
@@ -259,7 +262,8 @@ class CompanyDetails(models.Model):   # <<< rename from Companydetails
         blank=True,
         null=True,
         verbose_name="Purchase Order Template",
-        help_text="Template document (.docx) for generating purchase orders."
+        help_text="Template document (.docx) for generating purchase orders.",
+        validators=[FileExtensionValidator(allowed_extensions=['doc', 'docx', 'pdf'])],
     )
     
     admin_background = models.ImageField(
@@ -267,7 +271,8 @@ class CompanyDetails(models.Model):   # <<< rename from Companydetails
         blank=True,
         null=True,
         verbose_name="Admin Background Image",
-        help_text="Background image displayed on the admin dashboard (JPEG/PNG)."
+        help_text="Background image displayed on the admin dashboard (JPEG/PNG).",
+        validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'webp'])],
     )
     
     is_archived = models.BooleanField(default=False, db_index=True)

@@ -3,6 +3,7 @@ from django.db.models import Sum, Q
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import Http404, HttpResponse, JsonResponse
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
 from django.db import transaction
@@ -102,6 +103,7 @@ def log_model_changes(user, production, model_name, old_values, new_values):
         log_change(user, production, f"{model_name}: {change_str}")
     # If no changes, do nothing (no log entry)
         
+@login_required
 def product_size_api(request, pk):
     """Get product size and SKU data"""
     try:
@@ -111,6 +113,7 @@ def product_size_api(request, pk):
         return JsonResponse({'size': '', 'sku': ''})
 
 
+@login_required
 def product_sku_options_api(request, pk):
     """Get all SKU options for products with the same product_name and site"""
     try:
@@ -140,7 +143,7 @@ def product_sku_options_api(request, pk):
         return JsonResponse({'options': []})
     except Exception as e:
         print(f"[SKU API] Error: {str(e)}", file=sys.stderr)
-        return JsonResponse({'options': [], 'error': str(e)})
+        return JsonResponse({'options': []})
 
 
 
@@ -166,6 +169,7 @@ def get_batch_ref_type(batch_ref_string, stock_item):
     
 # ============= API VIEW =============
 
+@login_required
 @require_http_methods(["GET"])
 def get_batch_date(request):
     """API endpoint to get batch production date"""
@@ -2657,11 +2661,10 @@ def production_batch_detail_view(request, site_slug, production_date):
     return HttpResponse(html_content, content_type='text/html')
 
 
+@login_required
 @require_http_methods(["POST"])
 def delete_batch_ajax(request, batch_id):
     """Delete a single batch via AJAX (immediate deletion, no save needed)"""
-    from django.views.decorators.csrf import csrf_exempt
-    
     try:
         # Use ID (primary key) instead of batch_number which is only unique per site
         batch = Batch.objects.get(id=batch_id)
@@ -2686,9 +2689,10 @@ def delete_batch_ajax(request, batch_id):
         }, status=404)
     except Exception as e:
         import traceback
+        import logging
+        logging.getLogger(__name__).exception('Error deleting batch %s', batch_id)
         return JsonResponse({
             'success': False,
-            'error': f'{str(e)}',
-            'traceback': traceback.format_exc()
+            'error': 'An unexpected error occurred'
         }, status=500)
 

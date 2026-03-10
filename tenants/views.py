@@ -8,6 +8,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_protect
 from django.contrib.sessions.models import Session
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from .models import Site, UserSite
 
 User = get_user_model()
@@ -29,6 +30,11 @@ def hq_login(request):
     hq_username = request.POST.get('hq_username', '').strip()
     hq_password = request.POST.get('hq_password', '').strip()
     next_url = request.POST.get('next', '/hq/')
+    
+    # Validate redirect URL to prevent open redirects
+    from django.utils.http import url_has_allowed_host_and_scheme
+    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts=set(settings.ALLOWED_HOSTS), require_https=request.is_secure()):
+        next_url = '/hq/'
     
     if not hq_username or not hq_password:
         return render(request, 'hq/login.html', {
@@ -138,6 +144,7 @@ def site_admin_redirect(request, site_slug, path=''):
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
+@login_required
 @require_GET
 def get_batch_details(request, batch_id):
     """

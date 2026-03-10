@@ -3,6 +3,7 @@
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods, require_GET
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
 from django.db import models
 from django.urls import reverse
 from manufacturing.models import Waste, Batch
@@ -12,6 +13,7 @@ from decimal import Decimal
 from datetime import datetime
 import json
 
+@login_required
 def get_batch_qty(request):
     batch_id = request.GET.get("batch_id")
     qty = ""
@@ -24,6 +26,7 @@ def get_batch_qty(request):
     return JsonResponse({"qty": qty})
 
 
+@login_required
 @require_http_methods(["GET"])
 def get_unit(request, stock_item_id):
     """Get unit of measure for a stock item"""
@@ -56,6 +59,7 @@ def get_unit(request, stock_item_id):
         }, status=404)
 
 
+@login_required
 @require_GET
 def get_site_currency(request):
     """Get currency from current site's company details"""
@@ -126,7 +130,6 @@ def get_site_currency(request):
             print(log, file=sys.stderr)
         return JsonResponse({
             'currency': 'NAD',
-            'error': str(e),
         }, status=500)
 
 
@@ -213,7 +216,9 @@ def get_prod_batches(request, date_string):
     except ValueError:
         return JsonResponse({'error': 'Invalid date format'}, status=400)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        import logging
+        logging.getLogger(__name__).exception('Error in get_prod_batches')
+        return JsonResponse({'error': 'An unexpected error occurred'}, status=400)
 
 # ============= NEW ENDPOINTS FOR MANUFACTURING & COSTING =============
 
@@ -913,7 +918,9 @@ def available_stock(request):
         })
     
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        import logging
+        logging.getLogger(__name__).exception('Error in batch ref availability')
+        return JsonResponse({'error': 'An unexpected error occurred'}, status=500)
 
 
 @require_http_methods(["GET"])
@@ -1027,8 +1034,10 @@ def api_batches_for_date(request):
             'site': current_site.name if current_site else 'All Sites'
         })
     except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception('Error fetching batches')
         return JsonResponse({
-            'error': str(e),
+            'error': 'An unexpected error occurred',
             'batches': []
         }, status=500)
 

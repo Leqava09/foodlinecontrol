@@ -179,7 +179,6 @@ def get_quoted_calculation(product, stock_item, ideal_qty):
 
 @staff_member_required
 @require_http_methods(["GET"])
-@csrf_exempt
 def batch_summary_items_api(request, production_date_str):
     """
     DYNAMIC BATCH REF LOGIC - WITH DYNAMIC is_local DETERMINATION
@@ -220,7 +219,9 @@ def batch_summary_items_api(request, production_date_str):
             else:
                 return JsonResponse({'error': 'Production not found'}, status=404)
         except (ValueError, Exception) as e:
-            return JsonResponse({'error': f'Invalid date format or production ID: {str(e)}'}, status=400)
+            import logging
+            logging.getLogger(__name__).exception('Invalid date/production ID in batch_summary_items_api')
+            return JsonResponse({'error': 'Invalid date format or production ID'}, status=400)
     
     if not prod_date:
         return JsonResponse({'error': 'Could not determine production date'}, status=400)
@@ -831,7 +832,7 @@ def save_batch_approvals(request):
     except json.JSONDecodeError as e:
         return JsonResponse({
             'success': False,
-            'message': f'Invalid JSON: {str(e)}'
+            'message': 'Invalid JSON data'
         }, status=400)
     
     except Exception as e:
@@ -839,7 +840,7 @@ def save_batch_approvals(request):
         traceback.print_exc()
         return JsonResponse({
             'success': False,
-            'message': str(e)
+            'message': 'An unexpected error occurred'
         }, status=400)
 
 @staff_member_required
@@ -870,7 +871,7 @@ def update_batch_price_approval(request, pk):
                 print(f"   Set price to: {approval.batch_price_per_unit}")
             except Exception as e:
                 print(f"   [ERROR] Price parse error: {e}")
-                return JsonResponse({'ok': False, 'error': f'Invalid price: {str(e)}'}, status=400)
+                return JsonResponse({'ok': False, 'error': 'Invalid price format'}, status=400)
 
         approval.is_approved = is_approved_str == 'true'
         print(f"   Set approved to: {approval.is_approved}")
@@ -885,11 +886,10 @@ def update_batch_price_approval(request, pk):
         import traceback
         print(f"   [ERROR] Exception: {e}")
         traceback.print_exc()
-        return JsonResponse({'ok': False, 'error': str(e)}, status=400)
+        return JsonResponse({'ok': False, 'error': 'An unexpected error occurred'}, status=400)
 
 @staff_member_required
 @require_http_methods(["GET"])
-@csrf_exempt
 def batch_pricing_preview_api(request, pk):
     """Now handles multiple batch_costings: 1 or 1,2,3"""
     
@@ -1598,7 +1598,9 @@ def billing_document_preview(request, pk, doc_type):
         return response
 
     except Exception as e:
-        return HttpResponse(f"Error rendering document: {str(e)}", status=500)
+        import logging
+        logging.getLogger(__name__).exception('Error rendering document')
+        return HttpResponse("Error rendering document. Please contact support.", status=500)
 
 
 def get_batch_pricing_rows_for_header(header: BillingDocumentHeader):
@@ -1905,7 +1907,9 @@ def get_site_invoice_data(request):
     except BillingDocumentHeader.DoesNotExist:
         return JsonResponse({'error': f'Invoice {invoice_number} not found for this site'}, status=404)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        import logging
+        logging.getLogger(__name__).exception('Error fetching invoice data')
+        return JsonResponse({'error': 'An unexpected error occurred'}, status=500)
 
 
 @staff_member_required
@@ -1938,5 +1942,7 @@ def get_costing_price(request, costing_type, costing_id):
     except (OverheadCosting.DoesNotExist, SalaryCosting.DoesNotExist, InvestorLoanCosting.DoesNotExist):
         return JsonResponse({'error': 'Costing not found'}, status=404)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        import logging
+        logging.getLogger(__name__).exception('Error fetching costing price')
+        return JsonResponse({'error': 'An unexpected error occurred'}, status=500)
 

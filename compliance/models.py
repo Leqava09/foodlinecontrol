@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.validators import FileExtensionValidator
 from smart_selects.db_fields import ChainedForeignKey
 
 
@@ -255,7 +256,7 @@ class FactoryComplianceAttachment(models.Model):
         on_delete=models.CASCADE,
         related_name='attachments'
     )
-    file = models.FileField(upload_to='compliance/factory/')
+    file = models.FileField(upload_to='compliance/factory/', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -268,7 +269,7 @@ class PolicyComplianceAttachment(models.Model):
         on_delete=models.CASCADE,
         related_name='attachments'
     )
-    file = models.FileField(upload_to='compliance/policy/')
+    file = models.FileField(upload_to='compliance/policy/', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -281,7 +282,7 @@ class ProductComplianceAttachment(models.Model):
         on_delete=models.CASCADE,
         related_name='attachments'
     )
-    file = models.FileField(upload_to='compliance/product/')
+    file = models.FileField(upload_to='compliance/product/', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -294,7 +295,7 @@ class SpecSheetAttachment(models.Model):
         on_delete=models.CASCADE,
         related_name='attachments'
     )
-    file = models.FileField(upload_to='compliance/spec_sheets/')
+    file = models.FileField(upload_to='compliance/spec_sheets/', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -307,7 +308,7 @@ class ReportSheetAttachment(models.Model):
         on_delete=models.CASCADE,
         related_name='attachments'
     )
-    file = models.FileField(upload_to='compliance/report_sheets/')
+    file = models.FileField(upload_to='compliance/report_sheets/', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -320,7 +321,7 @@ class SopsComplianceAttachment(models.Model):
         on_delete=models.CASCADE,
         related_name='attachments'
     )
-    file = models.FileField(upload_to='compliance/sops/')
+    file = models.FileField(upload_to='compliance/sops/', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

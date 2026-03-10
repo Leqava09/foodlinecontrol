@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.validators import FileExtensionValidator
 from manufacturing.models import Production, Batch
 
 class Incident(models.Model):
@@ -63,7 +64,8 @@ class Incident(models.Model):
     incident_report = models.FileField(
         upload_to='incident_reports/', 
         blank=True, null=True, 
-        verbose_name="Incident Report (PDF or file)"
+        verbose_name="Incident Report (PDF or file)",
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])],
     )
 
     created = models.DateTimeField(auto_now_add=True, verbose_name="Created At")
@@ -86,7 +88,8 @@ class IncidentAttachment(models.Model):
     )
     file = models.FileField(
         upload_to='incident_evidence/', 
-        verbose_name="Attachment (PDF/JPEG)"
+        verbose_name="Attachment (PDF/JPEG)",
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'])],
     )
     uploaded_at = models.DateTimeField(auto_now_add=True)
     

@@ -1,5 +1,6 @@
  # models.py
 from django.db import models
+from django.core.validators import FileExtensionValidator
 from decimal import Decimal
 from django.db.models import Sum
 from manufacturing.models import Batch
@@ -115,7 +116,8 @@ class Container(models.Model):
     deposit_exchange_rate = models.DecimalField(max_digits=10, decimal_places=4, default=18.0000, verbose_name="Deposit Exchange Rate")
     deposit_doc = models.FileField(
         upload_to='container_docs/', blank=True, null=True,
-        verbose_name="Proforma/Quote/PO"
+        verbose_name="Proforma/Quote/PO",
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])],
     )
 
     # Final payment fields
@@ -123,7 +125,7 @@ class Container(models.Model):
     final_currency_from = models.CharField(max_length=3, choices=EXCHANGE_RATE_FROM_CHOICES, default='USD', verbose_name="Final Payment Currency From")
     final_currency_to = models.CharField(max_length=3, choices=EXCHANGE_RATE_TO_CHOICES, default='NAD', verbose_name="Final Payment Currency To")
     final_exchange_rate = models.DecimalField(max_digits=10, decimal_places=4, default=18.0000, verbose_name="Final Payment Exchange Rate")
-    final_payment_doc = models.FileField(upload_to='container_docs/', blank=True, null=True, verbose_name="Invoice")
+    final_payment_doc = models.FileField(upload_to='container_docs/', blank=True, null=True, verbose_name="Invoice", validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
 
     # Transport fields
     transport_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Transport Value")
@@ -136,7 +138,8 @@ class Container(models.Model):
     )
     transport_doc = models.FileField(
         upload_to='container_docs/', blank=True, null=True,
-        verbose_name="Transport Document"
+        verbose_name="Transport Document",
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])],
     )
     supplier = ChainedForeignKey(
         'commercial.Supplier',
@@ -203,7 +206,8 @@ class Container(models.Model):
     )
     commission_doc = models.FileField(
         upload_to='container_docs/', blank=True, null=True,
-        verbose_name="Commission Document"
+        verbose_name="Commission Document",
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])],
     )
 
     price_per_ton_calculated = models.DecimalField(
@@ -237,7 +241,8 @@ class Container(models.Model):
     fob_price_currency = models.CharField(max_length=3, choices=EXCHANGE_RATE_FROM_CHOICES, default='USD', verbose_name="FOB Currency")
     fob_price_doc = models.FileField(
         upload_to='container_docs/', blank=True, null=True,
-    verbose_name="Invoice"
+    verbose_name="Invoice",
+    validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])],
     )
 
     # Duty & Exchange
@@ -250,13 +255,14 @@ class Container(models.Model):
     )
     duty_doc = models.FileField(
         upload_to='container_docs/', blank=True, null=True,
-        verbose_name="Duty Document"
+        verbose_name="Duty Document",
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])],
     )
 
     # Clearing (no exchange rate; only NAD/ZAR)
     clearing = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Clearing")
     clearing_currency = models.CharField(max_length=3, choices=CLEARING_CURRENCY_CHOICES, default='NAD', verbose_name="Clearing Currency")
-    clearing_doc = models.FileField(upload_to='container_docs/', blank=True, null=True, verbose_name="Clearing Document")
+    clearing_doc = models.FileField(upload_to='container_docs/', blank=True, null=True, verbose_name="Clearing Document", validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     
     kg_per_box = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="kg/Box")
     total_boxes = models.IntegerField(default=0, verbose_name="Total Amount of Boxes")
@@ -269,11 +275,11 @@ class Container(models.Model):
     payment_terms = models.CharField(max_length=100, choices=PAYMENT_TERMS_CHOICES, blank=True, verbose_name="Payment Terms")
     payment_status = models.CharField(max_length=50, choices=PAYMENT_STATUS_CHOICES, default='Unpaid', verbose_name="Payment Status")
     permit_number = models.CharField(max_length=100, blank=True, verbose_name="Permit Number")
-    permit_doc = models.FileField(upload_to='container_docs/', blank=True, null=True, verbose_name="Permit Document")
+    permit_doc = models.FileField(upload_to='container_docs/', blank=True, null=True, verbose_name="Permit Document", validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     invoice = models.CharField(max_length=100, blank=True, verbose_name="INVOICE")
-    invoice_doc = models.FileField(upload_to='container_docs/', blank=True, null=True, verbose_name="Invoice Document")
+    invoice_doc = models.FileField(upload_to='container_docs/', blank=True, null=True, verbose_name="Invoice Document", validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     po_number = models.CharField(max_length=100, blank=True, verbose_name="PO Number")
-    po_doc = models.FileField(upload_to='container_docs/', blank=True, null=True, verbose_name="PO Document")
+    po_doc = models.FileField(upload_to='container_docs/', blank=True, null=True, verbose_name="PO Document", validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     vessel = models.CharField(max_length=100, blank=True, verbose_name="Vessel")
     booking = models.CharField(max_length=100, blank=True, verbose_name="BOOKING")
     ship_owner = models.CharField(max_length=50, choices=SHIP_OWNER_CHOICES, blank=True, verbose_name="SHIP OWNER")
@@ -503,7 +509,8 @@ class StockTransaction(models.Model):
     )
     transporter_document = models.FileField(
         upload_to='transporter_docs/', blank=True, null=True,
-        verbose_name="Transporter Document (PDF/DOC)"
+        verbose_name="Transporter Document (PDF/DOC)",
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])],
     )
     transaction_type = models.CharField(
         max_length=10, 
@@ -591,7 +598,7 @@ class StockTransaction(models.Model):
     total_invoice_amount_excl = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Total Invoice Amount Excl Transport and VAT", blank=True)
     transport_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Transport Cost", blank=True)
     transporter = models.ForeignKey('commercial.Transporter', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Transporter")
-    invoice_document = models.FileField(upload_to='invoices/', blank=True, null=True, verbose_name="Invoice Document (PDF/DOC)")
+    invoice_document = models.FileField(upload_to='invoices/', blank=True, null=True, verbose_name="Invoice Document (PDF/DOC)", validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])])
     usage_notes = models.TextField(blank=True)
     waste_per_production_batch = models.DecimalField(
         max_digits=10, decimal_places=2, default=0, verbose_name="Waste per Production Batch",
@@ -611,7 +618,8 @@ class StockTransaction(models.Model):
     )
     sauce_sheet = models.FileField(
         upload_to='sauce_sheets/', blank=True, null=True,
-        verbose_name="Sauce Mixing Sheet (PDF/DOC)"
+        verbose_name="Sauce Mixing Sheet (PDF/DOC)",
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'])],
     )
     is_archived = models.BooleanField(default=False, db_index=True)
     
@@ -1157,6 +1165,7 @@ class PickingSlip(models.Model):
         blank=True,
         null=True,
         verbose_name="Picking Slip PDF",
+        validators=[FileExtensionValidator(allowed_extensions=['pdf'])],
     )
 
     billing_date = models.DateField(

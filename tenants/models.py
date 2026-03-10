@@ -2,6 +2,7 @@
 Multi-site models - Simple FK-based approach (no django-tenants)
 """
 from django.db import models
+from django.core.validators import FileExtensionValidator
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password, check_password
 import threading
@@ -85,7 +86,8 @@ class Site(models.Model):
         blank=True,
         null=True,
         verbose_name="Admin Background Image",
-        help_text="Background image displayed on the admin dashboard for this site (JPEG/PNG)."
+        help_text="Background image displayed on the admin dashboard for this site (JPEG/PNG).",
+        validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'webp'])],
     )
     
     created_on = models.DateTimeField(auto_now_add=True)
