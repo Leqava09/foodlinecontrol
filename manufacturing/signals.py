@@ -60,7 +60,7 @@ def auto_create_batch_costing(sender, instance, created, **kwargs):
                 default_overhead = overhead_qs.first()
                 if default_overhead:
                     batch_costing.overhead_costing = default_overhead
-            except:
+            except Exception:
                 pass
         
         if not batch_costing.salary_costing_id:
@@ -73,7 +73,7 @@ def auto_create_batch_costing(sender, instance, created, **kwargs):
                 default_salary = salary_qs.first()
                 if default_salary:
                     batch_costing.salary_costing = default_salary
-            except:
+            except Exception:
                 pass
         
         batch_costing.save()

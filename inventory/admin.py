@@ -18,6 +18,9 @@ from django.db.models import Sum
 from decimal import Decimal
 from datetime import date
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 from itertools import groupby
 from operator import attrgetter
 from .models import Container, StockItem, StockTransaction, Amendment, StockCategory, StockSubCategory, UnitOfMeasure, FinishedProductTransaction, Batch, PickingSlip
@@ -172,10 +175,11 @@ class ContainerAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
     def display_track_container(self, obj):
         url = obj.get_tracking_url()
         if url:
-            return mark_safe(
+            return format_html(
                 '<div style="border:none;padding:0;margin:0;background:none;">'
-                '<a href="{0}" target="_blank" style="display:inline-block;padding: 10px 15px; background-color: #417690; color: white; text-decoration: none; border-radius: 4px; border:none !important;">Track Container {1}</a>'
-                '</div>'.format(url, obj.container_number)
+                '<a href="{}" target="_blank" style="display:inline-block;padding: 10px 15px; background-color: #417690; color: white; text-decoration: none; border-radius: 4px; border:none !important;">Track Container {}</a>'
+                '</div>',
+                url, obj.container_number
             )
         return "Set Ship Owner to enable tracking"
     display_track_container.short_description = "Container Tracking"
@@ -710,7 +714,7 @@ class AmendmentAdmin(admin.ModelAdmin):
                         tx = StockTransaction.objects.filter(batch_ref=amendment.batch_ref).order_by('pk').first()
                         if tx:
                             extra_context['back_url'] = reverse('admin:inventory_stocktransaction_change', args=[tx.pk])
-                except:
+                except Exception:
                     pass
         
         return super().changeform_view(request, object_id, form_url, extra_context)
@@ -860,7 +864,7 @@ class StockTransactionAdmin(SiteAwareModelAdmin, admin.ModelAdmin):
                     request.POST['category'] = str(category_id)  # Convert to string
                     request.POST._mutable = False
                 except Exception as e:
-                    print(f"[Category Injection] POST mutation failed: {e}")
+                    logger.warning("Category Injection POST mutation failed: %s", e)
             
             # Also store on request as backup
             request._category_id_fallback = category_id

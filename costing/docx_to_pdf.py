@@ -3,10 +3,13 @@ DOCX to PDF Conversion
 Uses MS Word COM on Windows or LibreOffice on Linux
 """
 
+import logging
 from io import BytesIO
 import os
 import sys
 import tempfile
+
+logger = logging.getLogger(__name__)
 
 
 def convert_docx_to_pdf(docx_path, pdf_path=None):
@@ -20,16 +23,14 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
     Returns:
         str or BytesIO: PDF file path or buffer
     """
-    print(f"\n=== DOCX to PDF Conversion ===")
-    print(f"Input: {docx_path}")
-    print(f"Output: {pdf_path or 'BytesIO buffer'}")
+    logger.debug('DOCX to PDF conversion: Input=%s, Output=%s', docx_path, pdf_path or 'BytesIO buffer')
     
     errors = []
     
     # Method 1: docx2pdf (Windows with MS Word COM)
     if sys.platform == 'win32':
         try:
-            print("Trying Method 1: docx2pdf (MS Word COM)")
+            logger.debug('Trying Method 1: docx2pdf (MS Word COM)')
             import pythoncom
             from docx2pdf import convert as docx2pdf_convert
             
@@ -38,7 +39,7 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
             try:
                 if pdf_path:
                     docx2pdf_convert(docx_path, pdf_path)
-                    print(f"[OK] Success with docx2pdf -> {pdf_path}")
+                    logger.debug('Success with docx2pdf -> %s', pdf_path)
                     return pdf_path
                 else:
                     # docx2pdf needs a file path, use temp file
@@ -48,19 +49,19 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
                     with open(temp_pdf, 'rb') as f:
                         buffer = BytesIO(f.read())
                     os.unlink(temp_pdf)
-                    print(f"[OK] Success with docx2pdf -> BytesIO buffer")
+                    logger.debug('Success with docx2pdf -> BytesIO buffer')
                     return buffer
             finally:
                 # Always clean up COM
                 pythoncom.CoUninitialize()
         except Exception as e:
             error_msg = f"docx2pdf failed: {str(e)}"
-            print(f"[X] {error_msg}")
+            logger.debug(error_msg)
             errors.append(error_msg)
     
     # Method 2: LibreOffice (Linux - best quality, requires LibreOffice installed)
     try:
-        print("Trying Method 2: LibreOffice")
+        logger.debug('Trying Method 2: LibreOffice')
         import subprocess
         
         if pdf_path:
@@ -82,29 +83,29 @@ def convert_docx_to_pdf(docx_path, pdf_path=None):
             if pdf_path:
                 if generated_pdf != pdf_path:
                     os.rename(generated_pdf, pdf_path)
-                print(f"[OK] Success with LibreOffice -> {pdf_path}")
+                logger.debug('Success with LibreOffice -> %s', pdf_path)
                 return pdf_path
             else:
                 with open(generated_pdf, 'rb') as f:
                     buffer = BytesIO(f.read())
                 os.unlink(generated_pdf)
-                print(f"[OK] Success with LibreOffice -> BytesIO buffer")
+                logger.debug('Success with LibreOffice -> BytesIO buffer')
                 return buffer
         else:
             raise Exception(f"LibreOffice conversion failed: {result.stderr}")
             
     except FileNotFoundError:
         error_msg = "LibreOffice not found - please contact hosting provider to install"
-        print(f"[X] {error_msg}")
+        logger.debug(error_msg)
         errors.append(error_msg)
     except Exception as e:
         error_msg = f"LibreOffice failed: {str(e)}"
-        print(f"[X] {error_msg}")
+        logger.debug(error_msg)
         errors.append(error_msg)
     
     # All methods failed - PDF conversion not available
     error_summary = " | ".join(errors)
-    print(f"\n[X] PDF conversion failed: {error_summary}")
+    logger.warning('PDF conversion failed: %s', error_summary)
     raise Exception(f"PDF conversion not available - LibreOffice not installed on server")
 
 

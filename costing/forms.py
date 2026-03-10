@@ -1,3 +1,4 @@
+import logging
 from django import forms
 from .models import (
     SalaryPosition,
@@ -9,6 +10,8 @@ from .models import (
     InvestorLoanItem,
 )
 from commercial.models import CompanyDetails
+
+logger = logging.getLogger(__name__)
 
 DATE_INPUTS = ["%d-%m-%Y", "%Y-%m-%d"]  # dd-mm-yyyy + ISO
 
@@ -431,19 +434,19 @@ class ImportBillingForm(forms.ModelForm):
                     batch_costings = site_invoice.batch_costings.all()
                     if batch_costings.exists():
                         instance.batch_costings.set(batch_costings)
-                        print(f"[OK] Copied {batch_costings.count()} batch_costings from site invoice {import_invoice} to HQ billing {instance.base_number}")
+                        logger.info('Copied %s batch_costings from site invoice %s to HQ billing %s', batch_costings.count(), import_invoice, instance.base_number)
                     else:
-                        print(f"[WARN] Site invoice {import_invoice} has no batch_costings!")
+                        logger.warning('Site invoice %s has no batch_costings', import_invoice)
                     
                     # Copy qty_for_invoice_data from source invoice if not already set
                     if not instance.qty_for_invoice_data and site_invoice.qty_for_invoice_data:
                         instance.qty_for_invoice_data = site_invoice.qty_for_invoice_data
                         instance.save(update_fields=['qty_for_invoice_data'])
-                        print(f"[OK] Copied qty_for_invoice_data from site invoice")
+                        logger.info('Copied qty_for_invoice_data from site invoice')
                 except BillingDocumentHeader.DoesNotExist:
-                    print(f"[ERROR] Could not find site invoice {import_invoice} in site {import_site.name}")
+                    logger.error('Could not find site invoice %s in site %s', import_invoice, import_site.name)
                 except Exception as e:
-                    print(f"[ERROR] copying batch_costings: {e}")
+                    logger.error('Error copying batch_costings: %s', e)
         
         return instance
 

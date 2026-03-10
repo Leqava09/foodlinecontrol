@@ -2,6 +2,7 @@ from django.db import models
 from decimal import Decimal, InvalidOperation
 from smart_selects.db_fields import ChainedForeignKey
 from django.utils.safestring import mark_safe
+from django.utils.html import escape
 from manufacturing.models import Batch
 from django.db.models import Sum
 from django.utils import timezone
@@ -583,15 +584,15 @@ class BatchCosting(models.Model):
             diff_color = '#d32f2f' if item['difference'] < 0 else '#4caf50'
             
             rows.append(f"""<tr style="background-color: {row_color}; border-bottom: 1px solid #ddd;">
-                <td style="border-right: 1px solid #ddd; padding: 10px; font-weight: 500; font-size: 12px;">{item['stock_item_name']}</td>
-                <td style="border-right: 1px solid #ddd; padding: 10px; text-align: center; font-size: 12px;">{item['unit']}</td>
+                <td style="border-right: 1px solid #ddd; padding: 10px; font-weight: 500; font-size: 12px;">{escape(item['stock_item_name'])}</td>
+                <td style="border-right: 1px solid #ddd; padding: 10px; text-align: center; font-size: 12px;">{escape(item['unit'])}</td>
                 <td style="border-right: 1px solid #ddd; padding: 10px; text-align: right; background-color: #e3f2fd; font-size: 12px;">
                     <strong>{item['ideal']:,.2f}</strong></td>
                 <td style="border-right: 1px solid #ddd; padding: 10px; text-align: right; background-color: #f3e5f5; font-size: 12px;">
                     <strong>{item['used']:,.2f}</strong></td>
                 <td style="border-right: 1px solid #ddd; padding: 10px; text-align: right; font-size: 12px;">
                     <strong style="color: {diff_color};">{item['difference']:+,.2f}</strong></td>
-                <td style="padding: 10px; text-align: left; font-size: 11px; max-width: 150px; word-break: break-word;">{item['batch_ref']}</td>
+                <td style="padding: 10px; text-align: left; font-size: 11px; max-width: 150px; word-break: break-word;">{escape(item['batch_ref'])}</td>
             </tr>""")
         
         html = f"""<table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; margin-bottom: 15px;">

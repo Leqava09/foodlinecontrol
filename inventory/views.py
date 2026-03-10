@@ -1,5 +1,6 @@
 # inventory/views.py
 
+import logging
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods, require_GET
 from django.contrib.admin.views.decorators import staff_member_required
@@ -12,6 +13,8 @@ from commercial.models import Supplier
 from decimal import Decimal
 from datetime import datetime
 import json
+
+logger = logging.getLogger(__name__)
 
 @login_required
 def get_batch_qty(request):
@@ -63,71 +66,44 @@ def get_unit(request, stock_item_id):
 @require_GET
 def get_site_currency(request):
     """Get currency from current site's company details"""
-    import sys
-    log_output = []
-    
     try:
         from commercial.models import CompanyDetails
         from tenants.models import Site
-        
-        log_output.append('[get_site_currency] Starting')
-        log_output.append(f'[get_site_currency] request.user: {request.user}')
-        log_output.append(f'[get_site_currency] request.user.is_authenticated: {request.user.is_authenticated}')
         
         current_site = None
         
         # Try 1: Get site from middleware
         current_site = getattr(request, 'current_site', None)
-        log_output.append(f'[get_site_currency] request.current_site: {current_site}')
         
         # Try 2: Get site from session
         if not current_site:
             site_id = request.session.get('current_site_id')
-            log_output.append(f'[get_site_currency] Session current_site_id: {site_id}')
             if site_id:
                 try:
                     current_site = Site.objects.get(pk=site_id)
-                    log_output.append(f'[get_site_currency] Found site from session: {current_site}')
                 except Site.DoesNotExist:
-                    log_output.append(f'[get_site_currency] Site not found for ID: {site_id}')
                     pass
         
         # Try 3: Use Django Sites framework
         if not current_site:
             from django.contrib.sites.shortcuts import get_current_site
             current_site = get_current_site(request)
-            log_output.append(f'[get_site_currency] Site from Sites framework: {current_site}')
-        
-        log_output.append(f'[get_site_currency] Final current_site: {current_site}')
         
         if current_site:
             company_details = CompanyDetails.objects.filter(site=current_site).first()
-            log_output.append(f'[get_site_currency] CompanyDetails: {company_details}')
-            if company_details:
-                log_output.append(f'[get_site_currency] Currency raw: "{company_details.currency}"')
-                if company_details.currency:
-                    currency_value = company_details.currency.strip() if company_details.currency else 'NAD'
-                    log_output.append(f'[get_site_currency] Currency stripped: "{currency_value}"')
-                    # Print logs to console
-                    for log in log_output:
-                        print(log, file=sys.stderr)
-                    return JsonResponse({
-                        'currency': currency_value or 'NAD',
-                    })
+            if company_details and company_details.currency:
+                currency_value = company_details.currency.strip()
+                return JsonResponse({
+                    'currency': currency_value or 'NAD',
+                })
         
         # Fallback to default currency
-        log_output.append(f'[get_site_currency] Returning default NAD')
-        for log in log_output:
-            print(log, file=sys.stderr)
         return JsonResponse({
             'currency': 'NAD',  # Default fallback
         })
     except Exception as e:
-        log_output.append(f'[get_site_currency] ERROR: {str(e)}')
-        import traceback
-        log_output.append(traceback.format_exc())
-        for log in log_output:
-            print(log, file=sys.stderr)
+        import logging
+        logging.getLogger(__name__).exception('Error getting site currency')
         return JsonResponse({
             'currency': 'NAD',
         }, status=500)
@@ -149,6 +125,7 @@ def get_stockitem(request, pk):
     except StockItem.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
 
+@login_required
 @require_http_methods(["GET"])
 def get_stockitem_by_batch(request):
     """Get stock_item by batch_ref - handles '/' separator for 2-LINE MODE"""
@@ -841,6 +818,7 @@ def batch_ready_dispatch_api(request):
 
     return JsonResponse({'ready': ready})
 
+@login_required
 @require_http_methods(["GET"])
 def api_finished_product_available(request, batch_id):
     """
@@ -923,6 +901,7 @@ def available_stock(request):
         return JsonResponse({'error': 'An unexpected error occurred'}, status=500)
 
 
+@login_required
 @require_http_methods(["GET"])
 def api_delivery_sites(request):
     """
@@ -967,6 +946,7 @@ def api_delivery_sites(request):
     })
 
 
+@login_required
 def api_batches_for_date(request):
     """
     Get batches for a given production date and current site.
@@ -1081,7 +1061,7 @@ def fix_docx_jinja_tags(docx_path):
         xml_str = xml_content.decode('utf-8')
         original_xml = xml_str
         
-        print("\n=== TEMPLATE TAG FIXING ===")
+        logger.debug('Template tag fixing started')
         
         def get_text_from_xml(xml_fragment):
             """Extract concatenated text from w:t tags in an XML fragment"""
@@ -1116,14 +1096,14 @@ def fix_docx_jinja_tags(docx_path):
                     
                     if '{%' in table_text and ' for ' in table_text:
                         # Move {% endfor %} into the table as new row
-                        print(f"  STRUCTURAL FIX: Moving {{% endfor %}} from body paragraph into table")
+                        logger.debug('STRUCTURAL FIX: Moving endfor from body paragraph into table')
                         endfor_row = '<w:tr><w:tc><w:p><w:r><w:t xml:space="preserve">{% endfor %}</w:t></w:r></w:p></w:tc></w:tr>'
                         replacement = endfor_row + '</w:tbl>' + match.group(2)
                         xml_str = xml_str[:match.start()] + replacement + xml_str[match.end():]
                         structural_fixes += 1
         
         if structural_fixes > 0:
-            print(f"Applied {structural_fixes} structural fix(es)")
+            logger.debug('Applied %s structural fix(es)', structural_fixes)
         
         # ============================================================
         # STEP 2: Fix jinja tags split across Word formatting runs
@@ -1145,7 +1125,7 @@ def fix_docx_jinja_tags(docx_path):
             if not jinja_patterns:
                 return paragraph_xml
             
-            print(f"  Found jinja in paragraph: {[p[2] for p in jinja_patterns]}")
+            logger.debug('Found jinja in paragraph: %s', [p[2] for p in jinja_patterns])
             
             p_open_match = re.match(r'(<w:p\b[^>]*>)', paragraph_xml)
             p_open = p_open_match.group(1) if p_open_match else '<w:p>'
@@ -1200,14 +1180,14 @@ def fix_docx_jinja_tags(docx_path):
                 xml_str = xml_str.replace(original_para, fixed_para, 1)
                 changes += 1
         
-        print(f"Fixed {changes} paragraphs with split jinja tags")
+        logger.debug('Fixed %s paragraphs with split jinja tags', changes)
         
         # If nothing changed, return original
         if xml_str == original_xml:
-            print("No jinja tags needed fixing - template is clean")
+            logger.debug('No jinja tags needed fixing - template is clean')
             return docx_path
         
-        print(f"Creating fixed template...")
+        logger.debug('Creating fixed template...')
         
         # Write back to docx
         with zipfile.ZipFile(temp_path, 'r') as zip_ref:
@@ -1225,13 +1205,11 @@ def fix_docx_jinja_tags(docx_path):
         os.remove(temp_path)
         os.rename(temp_path + '.new', temp_path)
         
-        print(f"[OK] Fixed template saved to: {temp_path}\n")
+        logger.debug('Fixed template saved to: %s', temp_path)
         return temp_path
             
     except Exception as e:
-        print(f"[WARNING] Could not fix DOCX tags: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.warning('Could not fix DOCX tags: %s', e)
         return docx_path
 
 
@@ -1458,25 +1436,7 @@ def po_document_preview(request, pk):
         doc = DocxTemplate(fixed_template_path)
         
         # Debug: Log what variables are being sent
-        print(f"\n=== PO DOCUMENT GENERATION DEBUG ===")
-        print(f"Template: {template_path}")
-        print(f"\nContext variables being passed:")
-        for key in sorted(context.keys()):
-            value = context[key]
-            if isinstance(value, list):
-                if value:
-                    print(f"  {key}: LIST with {len(value)} items")
-                    if value and isinstance(value[0], dict):
-                        print(f"    First item keys: {list(value[0].keys())}")
-                else:
-                    print(f"  {key}: EMPTY LIST")
-            elif isinstance(value, dict):
-                print(f"  {key}: DICT with {len(value)} keys - {list(value.keys())[:5]}")
-            else:
-                val_str = str(value)[:60]
-                print(f"  {key}: {val_str}")
-        print(f"\nTotal variables: {len(context)}")
-        print(f"=== END DEBUG ===\n")
+        logger.debug('PO Document Generation - Template: %s, Variables: %s', template_path, len(context))
         
         # Render the document with the context
         doc.render(context)
@@ -1489,36 +1449,18 @@ def po_document_preview(request, pk):
         # 3. Convert DOCX to PDF using Python libraries (no LibreOffice needed)
         try:
             from costing.docx_to_pdf import docx_to_pdf_bytes
-            import sys
             
-            # Log to both console and file
-            log_msg = f"\n{'='*60}\nATTEMPTING PO PDF CONVERSION\nDOCX Path: {docx_path}\nDOCX exists: {os.path.exists(docx_path)}\n{'='*60}\n"
-            print(log_msg, flush=True)
-            sys.stdout.flush()
-            with open('debug_pdf.log', 'a', encoding='utf-8') as f:
-                f.write(log_msg)
+            logger.debug('Attempting PO PDF conversion: %s', docx_path)
             
             pdf_content = docx_to_pdf_bytes(docx_path)
             
-            log_success = f"\n{'='*60}\n[OK] PO PDF CONVERSION SUCCESSFUL!\nPDF size: {len(pdf_content)} bytes\n{'='*60}\n"
-            print(log_success, flush=True)
-            sys.stdout.flush()
-            with open('debug_pdf.log', 'a', encoding='utf-8') as f:
-                f.write(log_success)
+            logger.debug('PO PDF conversion successful, size: %s bytes', len(pdf_content))
             
             # Clean up temp DOCX file
             os.unlink(docx_path)
             
         except Exception as conversion_error:
-            import traceback
-            import sys
-            error_trace = traceback.format_exc()
-            
-            log_error = f"\n{'='*60}\n[X] PO PDF CONVERSION FAILED!\nError: {str(conversion_error)}\nFull traceback:\n{error_trace}\nFalling back to DOCX...\n{'='*60}\n"
-            print(log_error, flush=True)
-            sys.stdout.flush()
-            with open('debug_pdf.log', 'a', encoding='utf-8') as f:
-                f.write(log_error)
+            logger.warning('PO PDF conversion failed, falling back to DOCX: %s', conversion_error)
             
             # Fallback: return DOCX if conversion fails
             with open(docx_path, 'rb') as f:
@@ -1529,7 +1471,6 @@ def po_document_preview(request, pk):
                 content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
             )
             response['Content-Disposition'] = f'attachment; filename="PO-{po.po_number}.docx"'
-            response['X-PDF-Error'] = str(conversion_error)[:200]  # Add error in header for debugging
             return response
 
         # 4. Return PDF
@@ -1538,36 +1479,25 @@ def po_document_preview(request, pk):
         return response
         
     except Exception as e:
-        import traceback
+        import logging
+        logging.getLogger(__name__).exception('Error generating PO document')
         error_msg = str(e)
         
         # Provide helpful error messages for common template issues
         if "'item' is undefined" in error_msg or "UndefinedError" in error_msg:
-            help_msg = (
-                f"<h2>Template Error: {error_msg}</h2>"
-                f"<p><strong>Problem:</strong> The PO template has jinja2 syntax errors, likely due to Word formatting applied inside template fields.</p>"
-                f"<p><strong>Solution:</strong> The template needs to be recreated without formatting inside {{{{ }}}} and {{% %}} placeholders.</p>"
-                f"<p><strong>Steps:</strong><ol>"
-                f"<li>Open the template in Microsoft Word: {template_path}</li>"
-                f"<li>Find all template fields like {{{{ item.quantity }}}} that have bold, italic, or colored text</li>"
-                f"<li>Remove the formatting from inside the template fields (select the {{% for %}} and {{{{ }}}} text and click 'Clear Formatting')</li>"
-                f"<li>Save and reload to test</li>"
-                f"</ol></p>"
-                f"<p><strong>Or:</strong> Contact support to get a corrected template.</p>"
+            return HttpResponse(
+                "Template error: The PO template has syntax issues. Please contact support.",
+                status=500
             )
-            return HttpResponse(help_msg, status=500, content_type='text/html')
         
         elif "XMLSyntaxError" in error_msg:
-            help_msg = (
-                f"<h2>Template Corruption Error</h2>"
-                f"<p>The Word template file appears to be corrupted. This can happen when Word applies extensive formatting to jinja2 fields.</p>"
-                f"<p><strong>Solution:</strong> Please restore the template from backup or request a new template.</p>"
+            return HttpResponse(
+                "Template corruption error. Please restore the template from backup or contact support.",
+                status=500
             )
-            return HttpResponse(help_msg, status=500, content_type='text/html')
         
         else:
-            traceback.print_exc()
-            return HttpResponse(f"Error generating PO document: {error_msg}", status=500)
+            return HttpResponse("Error generating PO document. Please contact support.", status=500)
 
 
 @staff_member_required

@@ -1,3 +1,4 @@
+import logging
 from django.db import models
 from django.contrib import admin
 from django.urls import reverse
@@ -10,6 +11,8 @@ from django.utils.safestring import mark_safe
 from django.contrib import messages
 from inventory.models import StockTransaction, StockItem
 from product_details.models import ProductCategory, Product
+
+logger = logging.getLogger(__name__)
 from . import views
 from django.core.exceptions import ValidationError
 from .forms import ProductionForm, BatchForm, BatchFormSet
@@ -225,13 +228,12 @@ class BatchInline(admin.TabularInline):
         
         # Set base_fields queryset for the entire form class
         if site:
-            print(f'[BatchInline.get_form] Setting site-filtered querysets for: {site}')
+            logger.debug('BatchInline.get_form: Setting site-filtered querysets for: %s', site)
             form.base_fields['category'].queryset = ProductCategory.objects.filter(site=site)
             form.base_fields['product'].queryset = Product.objects.filter(site=site)
-            print(f'[BatchInline.get_form] Category count: {form.base_fields["category"].queryset.count()}')
-            print(f'[BatchInline.get_form] Product count: {form.base_fields["product"].queryset.count()}')
+            logger.debug('BatchInline.get_form: Category count: %s, Product count: %s', form.base_fields['category'].queryset.count(), form.base_fields['product'].queryset.count())
         else:
-            print('[BatchInline.get_form] No current_site found in request')
+            logger.debug('BatchInline.get_form: No current_site found in request')
         
         return form
     
@@ -241,12 +243,12 @@ class BatchInline(admin.TabularInline):
             # Get the site from request
             if hasattr(request, 'current_site') and request.current_site:
                 kwargs['queryset'] = ProductCategory.objects.filter(site=request.current_site)
-                print(f'[BatchInline] Filtered category by site: {request.current_site}')
+                logger.debug('BatchInline: Filtered category by site: %s', request.current_site)
         elif db_field.name == 'product':
             # Filter products by current site
             if hasattr(request, 'current_site') and request.current_site:
                 kwargs['queryset'] = Product.objects.filter(site=request.current_site)
-                print(f'[BatchInline] Filtered product by site: {request.current_site}')
+                logger.debug('BatchInline: Filtered product by site: %s', request.current_site)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
     
     def save_model(self, request, obj, form, change):
@@ -478,8 +480,7 @@ class ProductionAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         date_str = obj.production_date.strftime('%Y%m%d')
         site_slug = obj.site.slug if obj.site else 'default'
         url = f"/manufacturing/batch/{site_slug}/{date_str}/detail/"  # ✅ Site-specific URL
-        html = f'<a class="button" href="{url}">📊 Batch Details - All Forms</a>'
-        return mark_safe(html)
+        return format_html('<a class="button" href="{}">📊 Batch Details - All Forms</a>', url)
     
     def a_no(self, obj):
         batch = Batch.objects.filter(production_date=obj.production_date, site=obj.site).first()
@@ -622,7 +623,7 @@ class ManufacturingReportAdmin(admin.ModelAdmin):
                 from datetime import datetime
                 df = datetime.strptime(date_from, '%Y-%m-%d').date()
                 queryset = queryset.filter(certification_date__gte=df)
-            except:
+            except Exception:
                 pass
         
         if date_to:
@@ -630,7 +631,7 @@ class ManufacturingReportAdmin(admin.ModelAdmin):
                 from datetime import datetime
                 dt = datetime.strptime(date_to, '%Y-%m-%d').date()
                 queryset = queryset.filter(certification_date__lte=dt)
-            except:
+            except Exception:
                 pass
         
         # Get all batches with ready_dispatch calculated
@@ -810,7 +811,7 @@ class StockUsageReportAdmin(admin.ModelAdmin):
                 from datetime import datetime
                 df = datetime.strptime(date_from, '%Y-%m-%d').date()
                 queryset_filtered = queryset_filtered.filter(production_date__gte=df)
-            except:
+            except Exception:
                 pass
         
         if date_to:
@@ -818,7 +819,7 @@ class StockUsageReportAdmin(admin.ModelAdmin):
                 from datetime import datetime
                 dt = datetime.strptime(date_to, '%Y-%m-%d').date()
                 queryset_filtered = queryset_filtered.filter(production_date__lte=dt)
-            except:
+            except Exception:
                 pass
         
         # Process data - group by container
@@ -946,7 +947,7 @@ class StockUsageReportAdmin(admin.ModelAdmin):
                     total_defrosted = sum((c.balance_from_prev_shift or 0) + (c.book_out_qty or 0) - (c.stock_left or 0) for c in day_containers)
                     if total_defrosted > 0:
                         loss_from_frozen_pouch = ((Decimal(str(total_defrosted)) - expected_output) / Decimal(str(total_defrosted))) * 100
-            except:
+            except Exception:
                 pass
             
             # Add display_category (remove underscores)

@@ -10,7 +10,7 @@ Site-level apps (Inventory, Manufacturing, etc.) are NOT registered here.
 from django.contrib import admin
 from django.contrib.admin import AdminSite
 from django import forms
-from django.utils.html import mark_safe, format_html
+from django.utils.html import escape, mark_safe, format_html
 from django.shortcuts import render, redirect
 from django.urls import path
 from django.contrib import messages
@@ -41,7 +41,7 @@ class HQAdminSite(AdminSite):
             return True
         try:
             return request.user.site_profile.is_hq_user
-        except:
+        except Exception:
             return False
     
     def each_context(self, request):
@@ -263,19 +263,20 @@ class HQSiteAdmin(admin.ModelAdmin):
         total = sum(counts.values())
         if total == 0:
             return mark_safe('<span style="color:#999;">No data</span>')
-        return mark_safe(f'<span title="{", ".join(f"{k}: {v}" for k, v in counts.items())}">{total} records</span>')
+        title = ", ".join(f"{k}: {v}" for k, v in counts.items())
+        return format_html('<span title="{}">{} records</span>', title, total)
     data_summary.short_description = 'Data'
     
     def display_name(self, obj):
         """Display site name with status indicator"""
         status = '✅' if obj.is_active else '⏸️'
-        return mark_safe(f'{status} {obj.name}')
+        return format_html('{} {}', status, obj.name)
     display_name.short_description = 'Site Name'
     
     def admin_link(self, obj):
         """Display link to site admin"""
         url = obj.get_admin_url()
-        return mark_safe(f'<a href="{url}" class="button" style="padding: 5px 10px;">Open Site Admin →</a>')
+        return format_html('<a href="{}" class="button" style="padding: 5px 10px;">Open Site Admin →</a>', url)
     admin_link.short_description = 'Access'
     
     def delete_model(self, request, obj):
@@ -314,7 +315,7 @@ class HQUserSiteAdmin(ArchivableAdmin):
     
     def hq_username_display(self, obj):
         """Display HQ username"""
-        return mark_safe(f'👤 {obj.hq_username}') if obj.hq_username else '(no username)'
+        return format_html('👤 {}', obj.hq_username) if obj.hq_username else '(no username)'
     hq_username_display.short_description = 'HQ Username'
     
     def get_queryset(self, request):
@@ -891,7 +892,7 @@ class HQBillingDocumentHeaderAdmin(BillingDocumentHeaderAdmin):
                     self.change_form_template = 'hq_admin/hq_billing_change_form.html'
             else:
                 self.change_form_template = None
-        except:
+        except Exception:
             pass
         
         try:
@@ -1060,7 +1061,7 @@ class HQIncidentDirectForm(forms.ModelForm):
                         parsed_date = parse_date(production_date)
                         if parsed_date:
                             queryset = queryset.filter(production_date=parsed_date)
-                    except:
+                    except Exception:
                         pass
                 self.fields['batch'].queryset = queryset.order_by('batch_number')
 
@@ -1220,7 +1221,7 @@ class HQIncidentAdmin(IncidentAdmin):
                     # Get current URL path and add mode=import parameter
                     current_path = request.path
                     return HttpResponseRedirect(f'{current_path}?mode=import')
-            except:
+            except Exception:
                 pass
         
         return super().change_view(request, object_id, form_url, extra_context)
@@ -1931,7 +1932,7 @@ class HQTransportLoadAdmin(TransportLoadAdmin):
         
         # Display existing custom documents
         for idx, doc_cat in enumerate(other_docs):
-            cat_name = doc_cat.get('name', 'Custom')
+            cat_name = escape(doc_cat.get('name', 'Custom'))
             files = doc_cat.get('files', [])
             
             html += '<tr style="border-bottom: 1px solid #e0e0e0;">'
@@ -1964,7 +1965,7 @@ class HQTransportLoadAdmin(TransportLoadAdmin):
             for file in files:
                 html += f'''
                 <li class="other-doc-item" style="display: inline-block; margin-right: 15px; margin-bottom: 5px;">
-                    <a href="/media/{file['file']}" target="_blank" style="color: #417690; font-size: 12px; text-decoration: none;">{file['filename']}</a>
+                    <a href="/media/{escape(file['file'])}" target="_blank" style="color: #417690; font-size: 12px; text-decoration: none;">{escape(file['filename'])}</a>
                     <button type="button"
                             class="other-remove-file"
                             data-idx="{idx}"

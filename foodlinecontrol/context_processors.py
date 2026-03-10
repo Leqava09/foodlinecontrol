@@ -18,7 +18,7 @@ def admin_background(request):
         company = CompanyDetails.objects.filter(site__isnull=True, is_active=True).first()
         if company and company.admin_background:
             return {'admin_background_url': company.admin_background.url}
-    except:
+    except Exception:
         pass
     
     return {'admin_background_url': None}
@@ -52,7 +52,7 @@ def site_context(request):
             # Use site_profiles (plural) - it's a ForeignKey, not OneToOne
             user_site = request.user.site_profiles.filter(is_hq_user=True, is_archived=False).first()
             is_hq = user_site is not None
-        except:
+        except Exception:
             pass
     context['is_hq_user'] = is_hq
     
@@ -80,7 +80,7 @@ def site_context(request):
                 user_site = request.user.site_profiles.filter(is_archived=False).first()
                 if user_site and user_site.assigned_site:
                     context['user_home_url'] = f'/hq/{user_site.assigned_site.slug}/admin/'
-            except:
+            except Exception:
                 pass
     
     return context

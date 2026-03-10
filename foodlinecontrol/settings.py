@@ -128,6 +128,7 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # For reverse pro
 SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=False, cast=bool)  # Set True in production (HTTPS only)
 CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=False, cast=bool)  # Set True in production (HTTPS only)
 SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
+SESSION_COOKIE_AGE = 28800  # 8 hours - auto-logout after inactivity
 CSRF_COOKIE_HTTPONLY = True  # Prevent JavaScript access to CSRF cookie
 SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
 CSRF_COOKIE_SAMESITE = 'Lax'  # CSRF protection

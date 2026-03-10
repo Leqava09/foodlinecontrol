@@ -1,9 +1,12 @@
 # transport/forms.py
 
+import logging
 from django import forms
 from .models import TransportLoad
 from commercial.models import Client, Transporter
 from tenants.models import Site
+
+logger = logging.getLogger(__name__)
 
 
 class ImportTransportForm(forms.ModelForm):
@@ -150,11 +153,11 @@ class ImportTransportForm(forms.ModelForm):
                     instance.other_documents = site_load.other_documents
                     
                     instance.save()
-                    print(f"[OK] Copied transport load data from site {import_site.name} load {import_load} to HQ load {hq_load}")
+                    logger.info("Copied transport load data from site %s load %s to HQ load %s", import_site.name, import_load, hq_load)
                 except TransportLoad.DoesNotExist:
-                    print(f"[ERROR] Could not find load {import_load} in site {import_site.name}")
+                    logger.error("Could not find load %s in site %s", import_load, import_site.name)
                 except Exception as e:
-                    print(f"[ERROR] copying transport load data: {e}")
+                    logger.error("Error copying transport load data: %s", e)
         
         return instance
 

@@ -2,7 +2,7 @@ import json
 from django.db.models import Sum
 from django.contrib import admin
 from django.urls import reverse
-from django.utils.html import format_html, mark_safe, format_html_join
+from django.utils.html import escape, format_html, mark_safe, format_html_join
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import path
 from django.http import HttpResponse
@@ -377,11 +377,11 @@ class SalaryCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         value = float(obj.price_per_unit or 0)
         formatted = f"{cur} {value:,.2f}" if value > 0 else "-"
         
-        html = f'<div style="text-align:center;"><span id="salary-price-per-unit">{formatted}</span>'
-        html += '<br><small style="color:#666; font-style:italic;">Grand total / Units + Bonus</small>'
-        html += '</div>'
+        html = format_html('<div style="text-align:center;"><span id="salary-price-per-unit">{}</span>', formatted)
+        html += mark_safe('<br><small style="color:#666; font-style:italic;">Grand total / Units + Bonus</small>')
+        html += mark_safe('</div>')
         
-        return mark_safe(html)
+        return html
     price_per_unit_display.short_description = "Price per Unit"
     def management_salary_display(self, obj):
         cur = get_company_currency()
@@ -631,20 +631,20 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
             rows.append(f"""
                 <tr>
                     <td style="border: 1px solid #ddd; padding: 10px; text-align: center; width: 120px;">
-                        <strong>{batch.batch_number}</strong>
+                        <strong>{escape(batch.batch_number)}</strong>
                     </td>
                     <td style="border: 1px solid #ddd; padding: 10px; width: 250px;">
-                        {product_name}
+                        {escape(product_name)}
                     </td>
                     <td style="border: 1px solid #ddd; padding: 10px; text-align: center; width: 80px;">
-                        {batch.size}
+                        {escape(batch.size)}
                     </td>
                     <td style="border: 1px solid #ddd; padding: 10px; text-align: center; width: 80px;">
                         <strong>{batch.shift_total:,}</strong>
                     </td>
                     <td style="border: 1px solid #ddd; padding: 10px; text-align: center; width: 150px;">
                         <span style="background-color: #e3f2fd; padding: 3px 8px; border-radius: 3px; font-size: 12px;">
-                            {batch.get_formatted_status()}
+                            {escape(batch.get_formatted_status())}
                         </span>
                     </td>
                     <td style="border: 1px solid #ddd; padding: 10px; text-align: center; font-weight: bold; color: #d32f2f; width: 120px;">
@@ -711,7 +711,7 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
             )
 
         # currency for this table
-        cur = get_company_currency()
+        cur = escape(get_company_currency())
 
         # Try get Waste data for Ready Dispatch
         try:
@@ -753,27 +753,27 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
             rows.append(f"""
                 <tr style="border-bottom: 1px solid #ddd; font-size: 11px;">
                     <td style="padding: 4px 6px; font-weight: bold; white-space: nowrap;">
-                        {batch.batch_number}
+                        {escape(batch.batch_number)}
                     </td>
                     <td style="padding: 4px 6px; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
-                        {product_name}
+                        {escape(product_name)}
                     </td>
                     <td style="padding: 4px 6px; text-align: center; white-space: nowrap;">
-                        {batch.size or 'N/A'}
+                        {escape(batch.size or 'N/A')}
                     </td>
                     <td style="padding: 4px 6px; text-align: right; white-space: nowrap;">
                         {batch.shift_total:,}
                     </td>
                     <td style="padding: 4px 6px; text-align: center;">
                         <span style="background-color: #e3f2fd; color: #1976d2; padding: 1px 4px; border-radius: 3px; font-size: 10px; white-space: nowrap;">
-                            {batch_status}
+                            {escape(batch_status)}
                         </span>
                     </td>
                     <td style="padding: 4px 6px; text-align: right; white-space: nowrap; font-weight: bold; color: #0277bd;">
                         {ready_for_dispatch:,.0f}
                     </td>
                     <td style="padding: 4px 6px; text-align: right; white-space: nowrap; font-weight: bold;">
-                        {cur} {price:,.2f}
+                        {escape(cur)} {price:,.2f}
                     </td>
                     <td style="padding: 4px 6px; text-align: center; color: {approved_color}; font-weight: bold;">
                         {approved_icon}
@@ -893,7 +893,7 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     def costing_summary_display(self, obj):
         if not obj:
             return "No data"
-        cur = get_company_currency()
+        cur = escape(get_company_currency())
         inv = float(obj.cost_per_unit_inventory or 0)
         oh = float(obj.overhead_price_per_unit or 0)
         sal = float(obj.salary_price_per_unit or 0)
@@ -1395,7 +1395,7 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         if not obj or not obj.product:
             return "Select a product first"
 
-        cur = get_company_currency()
+        cur = escape(get_company_currency())
         product = obj.product
         all_items = []
         
@@ -1436,9 +1436,9 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
             price_per_unit = Decimal(str(item['usage'])) * Decimal(str(item['price_incl']))
             rows.append(f"""
             <tr data-index="{idx}">
-                <td style="border:1px solid #ddd; padding:8px;">{item['name']}</td>
+                <td style="border:1px solid #ddd; padding:8px;">{escape(item['name'])}</td>
                 <td style="border:1px solid #ddd; padding:8px; text-align:center;">{item['usage']}</td>
-                <td style="border:1px solid #ddd; padding:8px; text-align:center;">{item['unit']}</td>
+                <td style="border:1px solid #ddd; padding:8px; text-align:center;">{escape(item['unit'])}</td>
                 <td style="border:1px solid #ddd; padding:8px; text-align:right;">{cur} {float(item['price_incl']):,.2f}</td>
                 <td style="border:1px solid #ddd; padding:8px; text-align:right;"><strong>{cur} {float(price_per_unit):,.2f}</strong></td>
                 <td style="border:1px solid #ddd; padding:8px; text-align:right;">

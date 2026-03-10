@@ -50,7 +50,7 @@ class SiteAdminMiddleware(MiddlewareMixin):
                     ).first()
                     if user_site and user_site.assigned_site:
                         site_slug = user_site.assigned_site.slug
-                except:
+                except Exception:
                     pass
             
             # Redirect to their site admin or HQ
@@ -177,5 +177,5 @@ class SiteAdminMiddleware(MiddlewareMixin):
             return True
         try:
             return user.site_profile.can_access_site(site)
-        except:
+        except Exception:
             return False

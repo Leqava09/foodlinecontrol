@@ -1,3 +1,4 @@
+import logging
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import path
@@ -7,6 +8,8 @@ from manufacturing.models import Batch
 from .forms import IncidentForm
 from foodlinecontrol.admin_base import ArchivableAdmin
 from tenants.admin_utils import SiteAwareModelAdmin
+
+logger = logging.getLogger(__name__)
 
 class IncidentAttachmentInline(admin.TabularInline):
     model = IncidentAttachment
@@ -44,39 +47,38 @@ class IncidentAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     
     def batch_options_view(self, request):
         """Return batch options filtered by production_date AND site"""
-        import sys
         
         production_date_str = request.GET.get('production_date')
         site_id = request.GET.get('site_id')
         
         production_date = parse_date(production_date_str) if production_date_str else None
         
-        print(f"DEBUG batch_options_view: production_date={production_date}, site_id={site_id}", file=sys.stderr)
+        logger.debug('batch_options_view: production_date=%s, site_id=%s', production_date, site_id)
         
         if not production_date:
             return JsonResponse([], safe=False)
         
         # Filter by production_date first
         batches = Batch.objects.filter(production_date=production_date)
-        print(f"DEBUG: Batches for date {production_date}: count={batches.count()}", file=sys.stderr)
+        logger.debug('Batches for date %s: count=%s', production_date, batches.count())
         
         # Then filter by site if site_id provided
         if site_id:
             try:
                 site_id_int = int(site_id)
                 batches = batches.filter(site_id=site_id_int)
-                print(f"DEBUG: Filtered by site_id={site_id_int}, count={batches.count()}", file=sys.stderr)
+                logger.debug('Filtered by site_id=%s, count=%s', site_id_int, batches.count())
             except (ValueError, TypeError) as e:
-                print(f"DEBUG: Error parsing site_id: {e}", file=sys.stderr)
+                logger.debug('Error parsing site_id: %s', e)
         else:
             # In site context, use current_site
             current_site = getattr(request, 'current_site', None)
-            print(f"DEBUG: current_site={current_site}", file=sys.stderr)
+            logger.debug('current_site=%s', current_site)
             if current_site:
                 batches = batches.filter(site=current_site)
-                print(f"DEBUG: Filtered by current_site, count={batches.count()}", file=sys.stderr)
+                logger.debug('Filtered by current_site, count=%s', batches.count())
             else:
-                print(f"DEBUG: No site filter applied! Returning all {batches.count()} batches", file=sys.stderr)
+                logger.debug('No site filter applied, returning all %s batches', batches.count())
         
         # Return batch options as JSON (value must be pk for Django ModelChoiceField)
         data = [
@@ -84,7 +86,7 @@ class IncidentAdmin(SiteAwareModelAdmin, ArchivableAdmin):
             for batch in batches.order_by('batch_number')
         ]
         
-        print(f"DEBUG: Returning {len(data)} batches", file=sys.stderr)
+        logger.debug('Returning %s batches', len(data))
         return JsonResponse(data, safe=False)
     
     def save_model(self, request, obj, form, change):

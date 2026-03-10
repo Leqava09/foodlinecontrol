@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.utils.html import mark_safe
+from django.utils.html import format_html, format_html_join, mark_safe
 from .models import (
     FactoryComplianceDocument, FactoryComplianceAttachment,
     PolicyComplianceDocument, PolicyComplianceAttachment,
@@ -43,8 +43,8 @@ class FactoryComplianceDocumentAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     list_display = ['title', 'issue_date', 'expiry_date', 'attachment_links']
     search_fields = ['title', 'comments']
     def attachment_links(self, obj):
-        links = [f'<a href="{a.file.url}" target="_blank">{a.file.name.split("/")[-1]}</a>' for a in obj.attachments.all()]
-        return mark_safe('<br>'.join(links) if links else '-')
+        links = format_html_join(mark_safe('<br>'), '<a href="{}" target="_blank">{}</a>', ((a.file.url, a.file.name.split('/')[-1]) for a in obj.attachments.all()))
+        return links or '-'
     attachment_links.short_description = "Attachments"
 
 # POLICY
@@ -75,9 +75,8 @@ class PolicyComplianceDocumentAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def attachment_links(self, obj):
-        links = [f'<a href="{a.file.url}" target="_blank">{a.file.name.split("/")[-1]}</a>'
-                 for a in obj.attachments.all()]
-        return mark_safe('<br>'.join(links) if links else '-')
+        links = format_html_join(mark_safe('<br>'), '<a href="{}" target="_blank">{}</a>', ((a.file.url, a.file.name.split('/')[-1]) for a in obj.attachments.all()))
+        return links or '-'
     attachment_links.short_description = "Attachments"
 
 
@@ -92,8 +91,8 @@ class ProductComplianceDocumentAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     list_display = ['title', 'issue_date', 'expiry_date', 'attachment_links']
     search_fields = ['title', 'comments']
     def attachment_links(self, obj):
-        links = [f'<a href="{a.file.url}" target="_blank">{a.file.name.split("/")[-1]}</a>' for a in obj.attachments.all()]
-        return mark_safe('<br>'.join(links) if links else '-')
+        links = format_html_join(mark_safe('<br>'), '<a href="{}" target="_blank">{}</a>', ((a.file.url, a.file.name.split('/')[-1]) for a in obj.attachments.all()))
+        return links or '-'
     attachment_links.short_description = "Attachments"
 
 # SOPS
@@ -124,9 +123,8 @@ class SopsComplianceDocumentAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def attachment_links(self, obj):
-        links = [f'<a href="{a.file.url}" target="_blank">{a.file.name.split("/")[-1]}</a>'
-                 for a in obj.attachments.all()]
-        return mark_safe('<br>'.join(links) if links else '-')
+        links = format_html_join(mark_safe('<br>'), '<a href="{}" target="_blank">{}</a>', ((a.file.url, a.file.name.split('/')[-1]) for a in obj.attachments.all()))
+        return links or '-'
     attachment_links.short_description = "Attachments"
 
 # SPEC SHEETS
@@ -141,8 +139,8 @@ class SpecSheetAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     list_display = ['title', 'issue_date', 'expiry_date', 'attachment_links']
     search_fields = ['title', 'comments']
     def attachment_links(self, obj):
-        links = [f'<a href="{a.file.url}" target="_blank">{a.file.name.split("/")[-1]}</a>' for a in obj.attachments.all()]
-        return mark_safe('<br>'.join(links) if links else '-')
+        links = format_html_join(mark_safe('<br>'), '<a href="{}" target="_blank">{}</a>', ((a.file.url, a.file.name.split('/')[-1]) for a in obj.attachments.all()))
+        return links or '-'
     attachment_links.short_description = "Attachments"
 # REPORT SHEETS
 class ReportSheetAttachmentInline(admin.TabularInline):
@@ -156,8 +154,8 @@ class ReportSheetAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     list_display = ['title', 'issue_date', 'expiry_date', 'attachment_links']
     search_fields = ['title', 'comments']
     def attachment_links(self, obj):
-        links = [f'<a href="{a.file.url}" target="_blank">{a.file.name.split("/")[-1]}</a>' for a in obj.attachments.all()]
-        return mark_safe('<br>'.join(links) if links else '-')
+        links = format_html_join(mark_safe('<br>'), '<a href="{}" target="_blank">{}</a>', ((a.file.url, a.file.name.split('/')[-1]) for a in obj.attachments.all()))
+        return links or '-'
     attachment_links.short_description = "Attachments"
 
 

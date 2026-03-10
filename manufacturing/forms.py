@@ -1,6 +1,9 @@
+import logging
 from django import forms
 from .models import Production, Batch
 from product_details.models import ProductCategory, Product
+
+logger = logging.getLogger(__name__)
 
 DATE_INPUTS = ["%d-%m-%Y", "%Y-%m-%d"]  # dd-mm-yyyy + ISO
 
@@ -60,11 +63,10 @@ class BatchForm(forms.ModelForm):
         # Filter category and product fields by current site if available from request
         if hasattr(self, '_current_site') and self._current_site:
             site = self._current_site
-            print(f'[BatchForm] Filtering fields for site: {site}')
+            logger.debug('BatchForm filtering fields for site: %s', site)
             self.fields['category'].queryset = ProductCategory.objects.filter(site=site)
             self.fields['product'].queryset = Product.objects.filter(site=site)
-            print(f'[BatchForm] Category queryset count: {self.fields["category"].queryset.count()}')
-            print(f'[BatchForm] Product queryset count: {self.fields["product"].queryset.count()}')
+            logger.debug('BatchForm category count: %s, product count: %s', self.fields['category'].queryset.count(), self.fields['product'].queryset.count())
         
         # Populate SKU choices dynamically when editing existing batch
         if self.instance and self.instance.pk and self.instance.product:

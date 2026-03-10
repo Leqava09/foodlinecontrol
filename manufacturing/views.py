@@ -1,3 +1,4 @@
+import logging
 from django import forms
 from django.db.models import Sum, Q
 from django.shortcuts import render, get_object_or_404, redirect
@@ -8,6 +9,8 @@ from django.views.decorators.http import require_http_methods
 from django.contrib import messages
 from django.db import transaction
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 from decimal import Decimal
 import json
 from manufacturing.utils import log_field_change
@@ -119,12 +122,7 @@ def product_sku_options_api(request, pk):
     try:
         product = Product.objects.get(pk=pk)
         
-        # Log what we're searching for
-        import sys
-        print(f"[SKU API] Product ID: {pk}", file=sys.stderr)
-        print(f"[SKU API] Product Name: {product.product_name}", file=sys.stderr)
-        print(f"[SKU API] Product Site: {product.site}", file=sys.stderr)
-        print(f"[SKU API] Product SKU: {product.sku}", file=sys.stderr)
+        logger.debug('SKU API: Product ID=%s, Name=%s, Site=%s, SKU=%s', pk, product.product_name, product.site, product.sku)
         
         # Get all products with the same product_name on the SAME SITE
         products = Product.objects.filter(
@@ -132,17 +130,15 @@ def product_sku_options_api(request, pk):
             site=product.site  # ✅ Filter by SAME site
         ).values_list('pk', 'sku', 'size').distinct()
         
-        print(f"[SKU API] Found {products.count()} matching products", file=sys.stderr)
-        for p in products:
-            print(f"[SKU API]   - ID:{p[0]}, SKU:{p[1]}, Size:{p[2]}", file=sys.stderr)
+        logger.debug('SKU API: Found %s matching products', products.count())
         
         options = [{'id': p[0], 'sku': p[1] or '', 'size': p[2] or ''} for p in products]
         return JsonResponse({'options': options})
     except Product.DoesNotExist:
-        print(f"[SKU API] Product {pk} not found", file=sys.stderr)
+        logger.debug('SKU API: Product %s not found', pk)
         return JsonResponse({'options': []})
     except Exception as e:
-        print(f"[SKU API] Error: {str(e)}", file=sys.stderr)
+        logger.error('SKU API error: %s', e)
         return JsonResponse({'options': []})
 
 
@@ -2116,9 +2112,9 @@ def production_batch_detail_view(request, site_slug, production_date):
                     
                     messages.success(request, '✅ Pouch waste data saved!')
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-            messages.error(request, f'❌ Error: {str(e)}')
+            import logging
+            logging.getLogger(__name__).exception('Error saving pouch waste data')
+            messages.error(request, '❌ An error occurred while saving. Please try again.')
         
         # Redirect
         if request.POST.get('save_action') == 'save_exit':

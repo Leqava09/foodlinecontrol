@@ -23,7 +23,7 @@ def get_user_site(user):
         hq_user_site = user.site_profiles.filter(is_hq_user=True, is_archived=False).first()
         if hq_user_site:
             return None  # HQ users see all data
-    except:
+    except Exception:
         pass
     
     # Check if user has a site assignment in session (site admin context)
@@ -32,7 +32,7 @@ def get_user_site(user):
         from tenants.models import Site
         try:
             return Site.objects.get(id=user._current_site_id)
-        except:
+        except Exception:
             pass
     
     # Check if user has a site assigned via UserSite
@@ -40,7 +40,7 @@ def get_user_site(user):
         site_user = user.site_profiles.filter(is_archived=False, assigned_site__isnull=False).first()
         if site_user:
             return site_user.assigned_site
-    except:
+    except Exception:
         pass
     
     return None

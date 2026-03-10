@@ -2,6 +2,9 @@ from django.contrib import admin
 from django.utils.html import format_html
 from .models import Person, Training, Induction, Leave, Department, PositionLevel
 import nested_admin
+import logging
+
+logger = logging.getLogger(__name__)
 from django.utils.formats import date_format
 from django.contrib import admin
 from django.utils.html import format_html
@@ -69,31 +72,28 @@ class TrainingInline(admin.StackedInline):
             site_id = None
             
             # DEBUG LOGGING
-            print(f"\n=== TRAINING POLICY CATEGORY FILTERING ===")
-            print(f"Person: {person_obj}")
-            print(f"Has request.current_site: {hasattr(request, 'current_site')}")
-            if hasattr(request, 'current_site'):
-                print(f"  request.current_site: {request.current_site}")
-            print(f"Has request._site_slug: {hasattr(request, '_site_slug')}")
-            if hasattr(request, '_site_slug'):
-                print(f"  request._site_slug: {request._site_slug}")
+            logger.debug(
+                "Training policy category filtering: person=%s, has_current_site=%s, has_site_slug=%s",
+                person_obj,
+                hasattr(request, 'current_site'),
+                hasattr(request, '_site_slug'),
+            )
             
             # Check if person has a site assigned (access site object explicitly)
             if person_obj and hasattr(person_obj, 'site') and person_obj.site is not None:
                 site_id = person_obj.site.id
-                print(f"  Using person's site_id: {site_id}")
+                logger.debug("Using person's site_id: %s", site_id)
             # Fall back to middleware-set current_site
             elif hasattr(request, 'current_site') and request.current_site:
                 site_id = request.current_site.id
-                print(f"  Using request.current_site: {request.current_site.name} (id: {site_id})")
+                logger.debug("Using request.current_site: %s (id: %s)", request.current_site.name, site_id)
             
             # Filter by site if found
             if site_id:
                 kwargs["queryset"] = PolicyCategory.objects.filter(site_id=site_id)
-                print(f"  Filtered to site {site_id}: {list(kwargs['queryset'].values_list('name', flat=True))}")
+                logger.debug("Filtered to site %s: %s", site_id, list(kwargs['queryset'].values_list('name', flat=True)))
             else:
-                print(f"  No site found - showing all")
-            print(f"=== END DEBUG ===\n")
+                logger.debug("No site found - showing all")
         
         elif db_field.name == "sop_category":
             from compliance.models import SopsCategory

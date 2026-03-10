@@ -6,6 +6,8 @@ Overrides the default smart-selects chaining endpoint to add site filtering.
 from smart_selects.views import FilteredSelectMultipleView, ChainedSelectChoicesView
 from django.http import JsonResponse, HttpResponse
 from django.views.generic import View
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
 from product_details.models import Product, ProductCategory
 from tenants.models import Site
 import json
@@ -39,6 +41,7 @@ class ProductByCategoryAndSiteView(View):
     URL pattern: /manufacturing/chaining/product-by-category/<int:category_id>/
     """
     
+    @method_decorator(login_required)
     def get(self, request, category_id):
         """Return products for category, filtered by site"""
         try:
@@ -64,4 +67,6 @@ class ProductByCategoryAndSiteView(View):
             return JsonResponse({'options': options})
         
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
+            import logging
+            logging.getLogger(__name__).exception('Error fetching products by category')
+            return JsonResponse({'error': 'An unexpected error occurred'}, status=500)

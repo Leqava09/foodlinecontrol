@@ -56,8 +56,7 @@ def _user_can_access_site(user, site):
         return True
     try:
         return user.site_profile.can_access_site(site)
-    except:
-        return False
+        except Exception:
 
 
 class SiteAdminSite(admin.AdminSite):

@@ -1,7 +1,7 @@
 # transport/admin.py
 
 from django.contrib import admin
-from django.utils.html import format_html
+from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
 from django.urls import reverse
 from .models import TransportLoad, DeliverySite
@@ -37,9 +37,9 @@ def _render_date_group(production_date, batch_rows):
         if i == 0:
             html += f'<td style="padding:8px; vertical-align:middle; font-weight:bold;" rowspan="{rowspan}">{production_link}</td>'
         
-        html += f'<td style="padding:8px;">{batch.get("batch_number", "-")}</td>'
-        html += f'<td style="padding:8px;">{batch.get("product", "-")}</td>'
-        html += f'<td style="padding:8px;">{batch.get("size", "-")}</td>'
+        html += f'<td style="padding:8px;">{escape(batch.get("batch_number", "-"))}</td>'
+        html += f'<td style="padding:8px;">{escape(batch.get("product", "-"))}</td>'
+        html += f'<td style="padding:8px;">{escape(batch.get("size", "-"))}</td>'
         html += f'<td style="padding:8px; text-align:right;">{batch.get("qty_for_invoice", 0):.0f}</td>'
         html += '</tr>'
     
@@ -184,7 +184,7 @@ class TransportLoadAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         other_docs = obj.other_documents if obj.other_documents else []
 
         for idx, doc_cat in enumerate(other_docs):
-            cat_name = doc_cat.get('name', 'Other')
+            cat_name = escape(doc_cat.get('name', 'Other'))
             files = doc_cat.get('files', [])
             
             html += '<tr style="border-bottom: 1px solid #e0e0e0;">'
@@ -219,7 +219,7 @@ class TransportLoadAdmin(SiteAwareModelAdmin, ArchivableAdmin):
             for file in files:
                 html += f'''
                 <li class="other-doc-item" style="display: inline-block; margin-right: 15px; margin-bottom: 5px;">
-                    <a href="/media/{file['file']}" target="_blank" style="color: #417690; font-size: 12px; text-decoration: none;">{file['filename']}</a>
+                    <a href="/media/{escape(file['file'])}" target="_blank" style="color: #417690; font-size: 12px; text-decoration: none;">{escape(file['filename'])}</a>
                     <button type="button"
                             class="other-remove-file"
                             data-idx="{idx}"
@@ -386,7 +386,7 @@ class TransportLoadAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         for doc in docs:
             html += f'''
             <li class="{doc_type}-doc-item" style="margin-bottom: 5px;">
-                <a href="/media/{doc['file']}" target="_blank" style="color: #417690; font-size: 12px;">{doc['filename']}</a>
+                <a href="/media/{escape(doc['file'])}" target="_blank" style="color: #417690; font-size: 12px;">{escape(doc['filename'])}</a>
                 <button type="button"
                         class="{doc_type}-remove-row"
                         data-doc-id="{doc['id']}"

@@ -16,7 +16,7 @@ def is_hq_user(user):
         return True
     try:
         return user.site_profile.is_hq_user
-    except:
+    except Exception:
         return False
 
 
@@ -50,16 +50,6 @@ def custom_logout(request):
     return redirect(redirect_url)
 
 
-def is_hq_user(user):
-    """Check if user is a superuser or HQ admin"""
-    if user.is_superuser:
-        return True
-    try:
-        return user.site_profile.is_hq_user
-    except:
-        return False
-
-
 @login_required
 def hq_dashboard(request):
     """
@@ -76,7 +66,7 @@ def hq_dashboard(request):
             user_site = request.user.site_profile
             if user_site.assigned_site:
                 return redirect(f'/hq/{user_site.assigned_site.slug}/admin/')
-        except:
+        except Exception:
             pass
         return HttpResponseForbidden("You don't have access to HQ dashboard.")
     

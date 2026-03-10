@@ -1,13 +1,17 @@
+import logging
 from datetime import datetime
 from decimal import Decimal
 from django.http import JsonResponse, Http404
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Sum
+
+logger = logging.getLogger(__name__)
 from django.urls import reverse
 import json
 from django.views.decorators.http import require_http_methods, require_POST
-from django.views.decorators.csrf import csrf_protect, csrf_exempt
+from django.views.decorators.csrf import csrf_protect
 from django.shortcuts import get_object_or_404, render
+from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from .models import BatchCosting, BatchPriceApproval, BillingDocumentHeader
@@ -226,7 +230,7 @@ def batch_summary_items_api(request, production_date_str):
     if not prod_date:
         return JsonResponse({'error': 'Could not determine production date'}, status=400)
     
-    print(f"[INFO] batch_summary_items_api: production_date={prod_date}, site={current_site}")
+    logger.debug('batch_summary_items_api: production_date=%s, site=%s', prod_date, current_site)
     
     # ✅ Filter Batch by production_date AND site
     batch_qs = Batch.objects.filter(production_date=prod_date)
@@ -263,7 +267,7 @@ def batch_summary_items_api(request, production_date_str):
         )
     
     batch_containers = batch_containers.order_by('pk')
-    print(f"   Batch Containers found: {batch_containers.count()} (production_date={prod_date})")
+    logger.debug('Batch Containers found: %s (production_date=%s)', batch_containers.count(), prod_date)
     
 
     for bc in batch_containers:
@@ -320,7 +324,7 @@ def batch_summary_items_api(request, production_date_str):
             'type': 'main_component',
         })
     
-    print(f"   Meat items processed: {len([i for i in items if i['section'] == 'meat'])}")
+    logger.debug('Meat items processed: %s', len([i for i in items if i['section'] == 'meat']))
     
     # ==================== SAUCE SECTION ====================
     # ✅ Filter RecipeStockItemBalance by site (through stock_item relationship)
@@ -763,11 +767,7 @@ def batch_summary_items_api(request, production_date_str):
     total_batch_units = float(total_pouches)  # NOT the Pouch Gravy used qty!
 
     # ==================== RETURN RESPONSE ====================
-    print(f"   [OK] Returning {len(items)} summary items to frontend")
-    for section in ['meat', 'sauce', 'packaging']:
-        count = len([i for i in items if i['section'] == section])
-        if count > 0:
-            print(f"      - {section}: {count} items")
+    logger.debug('Returning %s summary items to frontend', len(items))
     
     return JsonResponse({
         'items': items,
@@ -853,39 +853,33 @@ def update_batch_price_approval(request, pk):
     Called from batch_price_approval_save.js
     """
     
-    print(f"[INFO] update_batch_price_approval called: pk={pk}, user={request.user}")
+    logger.debug('update_batch_price_approval called: pk=%s, user=%s', pk, request.user)
     
     try:
         approval = get_object_or_404(BatchPriceApproval, pk=pk)
-        print(f"   Found approval: {approval.id} for batch {approval.batch.batch_number}")
+        logger.debug('Found approval: %s for batch %s', approval.id, approval.batch.batch_number)
 
         price_str = request.POST.get('batch_price_per_unit', '')
         is_approved_str = request.POST.get('is_approved', 'false')
-        
-        print(f"   Request data: price='{price_str}', approved='{is_approved_str}'")
         
         if price_str:
             price_clean = price_str.replace(',', '').strip()
             try:
                 approval.batch_price_per_unit = Decimal(price_clean)
-                print(f"   Set price to: {approval.batch_price_per_unit}")
             except Exception as e:
-                print(f"   [ERROR] Price parse error: {e}")
+                logger.error('Price parse error: %s', e)
                 return JsonResponse({'ok': False, 'error': 'Invalid price format'}, status=400)
 
         approval.is_approved = is_approved_str == 'true'
-        print(f"   Set approved to: {approval.is_approved}")
 
         approval.save()
-        print(f"   [OK] Saved approval to database")
+        logger.debug('Saved approval to database')
 
         # Return minimal response immediately (avoids timeout/broken pipe)
         return JsonResponse({'ok': True})
         
     except Exception as e:
-        import traceback
-        print(f"   [ERROR] Exception: {e}")
-        traceback.print_exc()
+        logger.exception('Error in update_batch_price_approval')
         return JsonResponse({'ok': False, 'error': 'An unexpected error occurred'}, status=400)
 
 @staff_member_required
@@ -921,7 +915,7 @@ def batch_pricing_preview_api(request, pk):
         try:
             current_billing = BillingDocumentHeader.objects.get(pk=billing_id)
             exclude_billing = True
-        except:
+        except Exception:
             pass
 
     # Get approvals from ALL batch costings
@@ -1071,17 +1065,13 @@ def billing_document_preview(request, pk, doc_type):
     total_amount = Decimal("0.00")  # Accumulator in from-currency
 
     # ============ CHECK FOR HQ LINE ITEMS FIRST ============
-    print(f"\n=== BILLING DATA DEBUG ===")
-    print(f"Header ID: {header.pk}")
-    print(f"Header Site: {header.site.name if header.site else 'HQ'}")
-    print(f"Line Items Count: {header.line_items.count()}")
-    print(f"Batch Costings Count: {header.batch_costings.count()}")
+    logger.debug('Billing data: Header ID=%s, Site=%s, Line Items=%s, Batch Costings=%s',
+                 header.pk, header.site.name if header.site else 'HQ',
+                 header.line_items.count(), header.batch_costings.count())
     
     if header.line_items.exists():
         # HQ BILLING: Use line_items (direct batch selection)
-        print(f"Using HQ line_items for billing document")
         line_items = header.line_items.select_related('batch', 'batch__product', 'site')
-        print(f"Line Items: {[li.pk for li in line_items]}")
         
         for line_item in line_items:
             batch = line_item.batch
@@ -1152,30 +1142,25 @@ def billing_document_preview(request, pk, doc_type):
                     "qty": f"{display_qty:.2f}",
                 })
         
-        print(f"Processed {len(table_rows)} line items for HQ billing")
+        logger.debug('Processed %s line items for HQ billing', len(table_rows))
     
     elif header.batch_costings.exists():
         # SITE BILLING: Use batch_costings (with approvals)
-        print(f"Using site batch_costings for billing document")
-        print(f"Batch Costings: {[bc.pk for bc in header.batch_costings.all()]}")
         
         approvals = BatchPriceApproval.objects.filter(
             batch_costing__in=header.batch_costings.all(),
             is_approved=True
         ).select_related("batch", "batch__product", "batch_costing")
         
-        print(f"Approved BatchPriceApprovals: {approvals.count()}")
+        logger.debug('Approved BatchPriceApprovals: %s', approvals.count())
         
-        if approvals.count() > 0:
-            print(f"Approval IDs: {[a.pk for a in approvals]}")
-        else:
+        if approvals.count() == 0:
             # Check if there are UN-approved ones
             all_approvals = BatchPriceApproval.objects.filter(
                 batch_costing__in=header.batch_costings.all()
             )
-            print(f"Total (including unapproved) BatchPriceApprovals: {all_approvals.count()}")
             if all_approvals.count() > 0:
-                print(f"WARNING: Found {all_approvals.count()} approvals but NONE are approved!")
+                logger.warning('Found %s approvals but NONE are approved', all_approvals.count())
         
         for approval in approvals:
             batch = approval.batch
@@ -1259,28 +1244,23 @@ def billing_document_preview(request, pk, doc_type):
                     "qty": f"{display_qty:.2f}",
                 })
         
-        print(f"Processed {len(table_rows)} batch costings for site billing")
-        print(f"Total amount accumulated: {total_amount}")
+        logger.debug('Processed %s batch costings for site billing, total amount: %s', len(table_rows), total_amount)
         
         # Additional debug if table_rows is empty but batch_costings exist
         if len(table_rows) == 0 and header.batch_costings.exists():
-            print("WARNING: Batch costings exist but no table rows generated!")
-            print("Possible causes:")
-            print("1. No BatchPriceApproval records found")
-            print("2. BatchPriceApprovals are not approved (is_approved=False)")
-            print("3. qty_for_invoice_data is empty")
+            logger.warning('Batch costings exist but no table rows generated - check approvals and qty_for_invoice_data')
             unapproved = BatchPriceApproval.objects.filter(
                 batch_costing__in=header.batch_costings.all(),
                 is_approved=False
             ).count()
             if unapproved > 0:
-                print(f"   -> Found {unapproved} UNAPPROVED batch price approvals - these need to be approved first!")
+                logger.warning('Found %s unapproved batch price approvals - these need to be approved first', unapproved)
     
     else:
         # FALLBACK: Check if this is an import with no batch_costings saved
         # (for existing records before the fix was applied)
         if header.import_source_site and header.import_source_invoice_number:
-            print(f"Attempting fallback: looking up source invoice {header.import_source_invoice_number} from site {header.import_source_site.name}")
+            logger.debug('Attempting fallback: looking up source invoice %s from site %s', header.import_source_invoice_number, header.import_source_site.name)
             try:
                 source_invoice = BillingDocumentHeader.objects.get(
                     site=header.import_source_site,
@@ -1290,14 +1270,14 @@ def billing_document_preview(request, pk, doc_type):
                 if source_batch_costings.exists():
                     # Copy batch_costings to this header for future use
                     header.batch_costings.set(source_batch_costings)
-                    print(f"[OK] Copied {source_batch_costings.count()} batch_costings from source invoice")
+                    logger.debug('Copied %s batch_costings from source invoice', source_batch_costings.count())
                     
                     # Copy qty_for_invoice_data from source if HQ header doesn't have it
                     source_qty_data = source_invoice.qty_for_invoice_data or {}
                     if not header.qty_for_invoice_data and source_qty_data:
                         header.qty_for_invoice_data = source_qty_data
                         header.save(update_fields=['qty_for_invoice_data'])
-                        print(f"[OK] Copied qty_for_invoice_data from source invoice")
+                        logger.debug('Copied qty_for_invoice_data from source invoice')
                     
                     # Use the source invoice's qty data for processing
                     raw_qty_data = header.qty_for_invoice_data or source_qty_data
@@ -1309,7 +1289,7 @@ def billing_document_preview(request, pk, doc_type):
                         is_approved=True
                     ).select_related("batch", "batch__product", "batch_costing")
                     
-                    print(f"Approved BatchPriceApprovals from source: {approvals.count()}")
+                    logger.debug('Approved BatchPriceApprovals from source: %s', approvals.count())
                     
                     for approval in approvals:
                         batch = approval.batch
@@ -1350,19 +1330,17 @@ def billing_document_preview(request, pk, doc_type):
                                 "qty": f"{display_qty:.2f}",
                             })
                     
-                    print(f"Processed {len(table_rows)} rows from source invoice fallback")
+                    logger.debug('Processed %s rows from source invoice fallback', len(table_rows))
                 else:
-                    print(f"WARNING: Source invoice has no batch_costings either!")
+                    logger.warning('Source invoice has no batch_costings either')
             except BillingDocumentHeader.DoesNotExist:
-                print(f"ERROR: Source invoice {header.import_source_invoice_number} not found in site {header.import_source_site.name}")
+                logger.error('Source invoice %s not found in site %s', header.import_source_invoice_number, header.import_source_site.name)
             except Exception as e:
-                print(f"ERROR in fallback: {e}")
+                logger.error('Error in fallback: %s', e)
         else:
-            print("WARNING: No line_items or batch_costings linked to this billing header!")
+            logger.warning('No line_items or batch_costings linked to this billing header')
     
-    print(f"Total table rows: {len(table_rows)}")
-    print(f"Total amount before exchange rate: {total_amount}")
-    print(f"=== END DEBUG ===\n")
+    logger.debug('Total table rows: %s, total amount before exchange rate: %s', len(table_rows), total_amount)
 
 
     client = header.client
@@ -1511,31 +1489,9 @@ def billing_document_preview(request, pk, doc_type):
         doc = DocxTemplate(fixed_template_path)
         
         # Debug: Log what variables are being sent
-        print(f"\n=== BILLING DOCUMENT GENERATION DEBUG ===")
-        print(f"Document Type: {doc_type} ({document_type})")
-        print(f"Template: {company.billing_template.path}")
-        print(f"Site: {header.site.name if header.site else 'HQ'}")
-        print(f"Company Name: {context.get('company_name', 'MISSING')}")
-        print(f"Company Legal Name: {context.get('company_legal_name', 'MISSING')}")
-        print(f"Company Address Line 1: {context.get('company_address_line1', 'MISSING')}")
-        print(f"\nContext variables being passed:")
-        for key in sorted(context.keys()):
-            value = context[key]
-            if isinstance(value, list):
-                if value:
-                    print(f"  {key}: LIST with {len(value)} items")
-                    if value and isinstance(value[0], dict):
-                        print(f"    First item keys: {list(value[0].keys())}")
-                        print(f"    First item values: {list(value[0].values())[:3]}")
-                else:
-                    print(f"  {key}: EMPTY LIST")
-            elif isinstance(value, dict):
-                print(f"  {key}: DICT with {len(value)} keys")
-            else:
-                val_str = str(value)[:60]
-                print(f"  {key}: {val_str}")
-        print(f"\nTotal variables: {len(context)}")
-        print(f"=== END DEBUG ===\n")
+        logger.debug('Billing document generation: Type=%s (%s), Template=%s, Site=%s, Variables=%s',
+                     doc_type, document_type, company.billing_template.path,
+                     header.site.name if header.site else 'HQ', len(context))
         
         doc.render(context)
 
@@ -1547,36 +1503,18 @@ def billing_document_preview(request, pk, doc_type):
         # 3. Convert DOCX to PDF using Python libraries (no LibreOffice needed)
         try:
             from .docx_to_pdf import docx_to_pdf_bytes
-            import sys
             
-            # Log to both console and file
-            log_msg = f"\n{'='*60}\nATTEMPTING PDF CONVERSION\nDOCX Path: {docx_path}\nDOCX exists: {os.path.exists(docx_path)}\n{'='*60}\n"
-            print(log_msg, flush=True)
-            sys.stdout.flush()
-            with open('debug_pdf.log', 'a', encoding='utf-8') as f:
-                f.write(log_msg)
+            logger.debug('Attempting PDF conversion: %s', docx_path)
             
             pdf_content = docx_to_pdf_bytes(docx_path)
             
-            log_success = f"\n{'='*60}\n[OK] PDF CONVERSION SUCCESSFUL!\nPDF size: {len(pdf_content)} bytes\n{'='*60}\n"
-            print(log_success, flush=True)
-            sys.stdout.flush()
-            with open('debug_pdf.log', 'a', encoding='utf-8') as f:
-                f.write(log_success)
+            logger.debug('PDF conversion successful, size: %s bytes', len(pdf_content))
             
             # Clean up temp DOCX file
             os.unlink(docx_path)
             
         except Exception as conversion_error:
-            import traceback
-            import sys
-            error_trace = traceback.format_exc()
-            
-            log_error = f"\n{'='*60}\n[X] PDF CONVERSION FAILED!\nError: {str(conversion_error)}\nFull traceback:\n{error_trace}\nFalling back to DOCX...\n{'='*60}\n"
-            print(log_error, flush=True)
-            sys.stdout.flush()
-            with open('debug_pdf.log', 'a', encoding='utf-8') as f:
-                f.write(log_error)
+            logger.warning('PDF conversion failed, falling back to DOCX: %s', conversion_error)
             
             # Fallback: return DOCX if conversion fails
             with open(docx_path, 'rb') as f:
@@ -1587,7 +1525,6 @@ def billing_document_preview(request, pk, doc_type):
                 content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
             )
             response['Content-Disposition'] = f'attachment; filename="{document_type}_{header.base_number}.docx"'
-            response['X-PDF-Error'] = str(conversion_error)[:200]  # Add error in header for debugging
             return response
 
         # 4. Return PDF
@@ -1769,6 +1706,7 @@ Kind regards"""
         content_type="text/html"
     )
 
+@login_required
 @require_GET
 def batches_by_date(request, date_str):
     """Return batch costing IDs for a given production date"""
@@ -1783,6 +1721,7 @@ def batches_by_date(request, date_str):
     
     return JsonResponse({'batch_costing_ids': list(batch_ids)})
 
+@login_required
 @require_GET
 def dates_to_batch_costings(request):
     """Convert DD/MM/YYYY dates to batch_costing IDs (filtered by site)"""

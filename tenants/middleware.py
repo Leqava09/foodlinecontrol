@@ -193,7 +193,7 @@ class SiteMiddleware:
             if user_site:
                 return user_site.can_access_site(site)
             return False
-        except:
+        except Exception:
             return False
     
     def _user_is_hq(self, user):
@@ -206,7 +206,7 @@ class SiteMiddleware:
             # Use site_profiles (plural) - it's a ForeignKey, not OneToOne
             user_site = user.site_profiles.filter(is_hq_user=True, is_archived=False).first()
             return user_site is not None
-        except:
+        except Exception:
             return False
     
     def _get_user_site_redirect(self, user):
@@ -216,6 +216,6 @@ class SiteMiddleware:
             user_site = user.site_profiles.filter(is_archived=False).first()
             if user_site and user_site.assigned_site:
                 return f'/hq/{user_site.assigned_site.slug}/admin/'
-        except:
+        except Exception:
             pass
         return None
