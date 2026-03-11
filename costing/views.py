@@ -1582,11 +1582,13 @@ def get_batch_pricing_rows_for_header(header: BillingDocumentHeader):
 
 def email_billing_document(request, pk, doc_type):
     """
-    Opens email with the PDF document:
-    1. First downloads the PDF file
-    2. Then opens mailto with pre-filled subject/body
-    User just needs to attach the downloaded file.
+    Opens the user's email client via mailto: with To/Subject/Body pre-filled
+    and simultaneously downloads the PDF for the user to attach.
     """
+    import base64
+    from urllib.parse import quote
+    from django.utils.html import escape
+
     header = get_object_or_404(BillingDocumentHeader, pk=pk)
     
     doc_type_upper = doc_type.upper()
@@ -1618,93 +1620,79 @@ def email_billing_document(request, pk, doc_type):
             content_type="text/html"
         )
     
-    # Build the PDF preview URL (to download)
-    pdf_url = reverse("costing:billing_document_preview", args=[pk, doc_type_upper])
-    
-    # Build filename
+    # Build document details
     doc_number = f"{document_prefix} {header.base_number}" if document_prefix else header.base_number
-    filename = f"{document_type.replace(' ', '_')}_{header.base_number}.pdf"
-    
-    # Build mailto link
+    pdf_filename = f"{document_type.replace(' ', '_')}_{header.base_number}.pdf"
     subject = f"{document_type} {doc_number}"
-    body = f"""Dear {header.client.contact_person or header.client.name or 'Customer'},
-
-Please find attached {document_type} {doc_number}.
-
-Kind regards"""
     
-    mailto_url = f"mailto:{client_email}?subject={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
+    # Determine the company
+    if header.site:
+        company = CompanyDetails.objects.filter(site=header.site, is_active=True).first()
+    else:
+        company = CompanyDetails.objects.filter(site__isnull=True, is_active=True).first()
+    if not company:
+        company = CompanyDetails.objects.filter(is_active=True).first()
+    company_name = company.name if company else 'Management'
     
-    # Return HTML that:
-    # 1. Downloads the PDF via hidden iframe
-    # 2. Opens the mailto link
-    # 3. Shows instructions
-    return HttpResponse(
-        f"""
-        <html>
-        <head>
-            <title>Email {document_type}</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; padding: 40px; text-align: center; background: #f5f5f5; }}
-                .container {{ background: white; padding: 30px; border-radius: 8px; max-width: 500px; margin: 0 auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
-                h2 {{ color: #417690; margin-bottom: 20px; }}
-                .step {{ text-align: left; margin: 15px 0; padding: 10px; background: #f9f9f9; border-radius: 4px; }}
-                .step-num {{ display: inline-block; width: 24px; height: 24px; background: #417690; color: white; border-radius: 50%; text-align: center; line-height: 24px; margin-right: 10px; font-size: 12px; }}
-                .filename {{ font-family: monospace; background: #e8e8e8; padding: 2px 6px; border-radius: 3px; }}
-                .close-btn {{ margin-top: 20px; padding: 10px 20px; background: #417690; color: white; border: none; border-radius: 4px; cursor: pointer; }}
-                .close-btn:hover {{ background: #205067; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h2>📧 Email {document_type}</h2>
-                <p>Your email client is opening with the document details.</p>
-                
-                <div class="step">
-                    <span class="step-num">1</span>
-                    PDF downloading: <span class="filename">{filename}</span>
-                </div>
-                <div class="step">
-                    <span class="step-num">2</span>
-                    Email opening with subject and body pre-filled
-                </div>
-                <div class="step">
-                    <span class="step-num">3</span>
-                    Attach the downloaded PDF to the email
-                </div>
-                
-                <button class="close-btn" onclick="window.close()">Close Window</button>
-            </div>
-            
-            <!-- Hidden iframe to trigger PDF download -->
-            <iframe id="pdf-download" style="display:none;"></iframe>
-            
-            <script>
-                // Step 1: Download PDF
-                var downloadUrl = "{pdf_url}";
-                var link = document.createElement('a');
-                link.href = downloadUrl;
-                link.download = "{filename}";
-                link.target = "_blank";
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                // Step 2: Open mailto after short delay
-                setTimeout(function() {{
-                    window.location.href = "{mailto_url}";
-                }}, 1000);
-                
-                // Auto-close after 10 seconds
-                setTimeout(function() {{
-                    window.close();
-                }}, 10000);
-            </script>
-        </body>
-        </html>
-        """,
-        content_type="text/html"
+    # Sender info
+    user = request.user
+    sender_name = user.get_full_name() or user.username
+    user_email = user.email if user.is_authenticated else ''
+    if not user_email and user.is_authenticated:
+        from tenants.models import UserSite
+        us = UserSite.objects.filter(user=user).first()
+        if us and us.email:
+            user_email = us.email
+    
+    body_text = (
+        f"Dear {header.client.contact_person or header.client.name or 'Customer'},\n\n"
+        f"Please find attached {document_type} {doc_number}.\n\n"
+        f"Kind regards,\n"
+        f"{sender_name}\n"
+        f"{company_name}"
     )
+    
+    # Generate the PDF
+    try:
+        from django.test import RequestFactory
+        factory = RequestFactory()
+        pdf_request = factory.get(reverse("costing:billing_document_preview", args=[pk, doc_type_upper]))
+        pdf_request.user = request.user
+        pdf_response = billing_document_preview(pdf_request, pk, doc_type_upper)
+        
+        if pdf_response.status_code != 200:
+            return HttpResponse("Error generating PDF", status=500)
+        pdf_content = pdf_response.content
+    except Exception as e:
+        logger.exception('Failed to generate billing document PDF for email')
+        return HttpResponse(f"Error generating PDF: {e}", status=500)
+    
+    # Build mailto link and PDF data URI
+    mailto_link = f"mailto:{quote(client_email)}?subject={quote(subject)}&body={quote(body_text)}"
+    pdf_b64 = base64.b64encode(pdf_content).decode()
+    safe_doc_type = escape(document_type)
+    safe_filename = escape(pdf_filename)
+    
+    html = (
+        '<!DOCTYPE html><html><head>'
+        f'<title>Email {safe_doc_type}</title>'
+        '</head><body style="font-family:Arial,sans-serif;text-align:center;padding:50px;">'
+        f'<h2>\U0001f4e7 Opening your email client...</h2>'
+        f'<p style="font-size:16px;">The PDF <b>{safe_filename}</b> is downloading.<br>'
+        'Please <b>attach</b> it to the email that just opened.</p>'
+        '<p style="margin-top:30px;">'
+        f'<a id="mailto-link" href="{mailto_link}" style="margin-right:15px;">\U0001f4e8 Open email again</a>'
+        f'<a id="pdf-link" href="data:application/pdf;base64,{pdf_b64}" '
+        f'download="{safe_filename}">\U0001f4c4 Download PDF again</a>'
+        '</p>'
+        '<script>'
+        'document.getElementById("pdf-link").click();'
+        'setTimeout(function(){window.location.href=document.getElementById("mailto-link").href;},800);'
+        'setTimeout(function(){window.close();},8000);'
+        '</script>'
+        '</body></html>'
+    )
+    return HttpResponse(html, content_type='text/html')
 
 @login_required
 @require_GET

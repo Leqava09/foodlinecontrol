@@ -1503,24 +1503,20 @@ def po_document_preview(request, pk):
 @staff_member_required
 def email_po_document(request, pk):
     """
-    Opens email with the PDF document (same workflow as billing):
-    1. First downloads the PDF file
-    2. Then opens mailto with pre-filled subject/body
-    User just needs to attach the downloaded file.
+    Opens the user's email client via mailto: with To/Subject/Body pre-filled
+    and simultaneously downloads the PDF for the user to attach.
     """
-    import urllib.parse
+    import base64
+    from urllib.parse import quote
+    from django.utils.html import escape
     
     po = get_object_or_404(PurchaseOrder, pk=pk)
     # For multi-tenant isolation: ALWAYS determine company based on who created the PO
-    # HQ orders (is_hq_order=True) use HQ company even if they have a site assigned
     if po.is_hq_order:
-        # HQ PO: use HQ company (site__isnull=True)
         company = CompanyDetails.objects.filter(site__isnull=True, is_active=True).first()
     elif po.site:
-        # Site PO: use site's company
         company = CompanyDetails.objects.filter(site=po.site, is_active=True).first()
     else:
-        # Fallback to HQ company
         company = CompanyDetails.objects.filter(site__isnull=True, is_active=True).first()
     
     if not company:
@@ -1538,97 +1534,71 @@ def email_po_document(request, pk):
         )
     
     # Currency symbols
-    currency_symbols = {'R': 'R', 'NAD': 'N$', 'USD': '$', 'EUR': '€'}
+    currency_symbols = {'R': 'R', 'NAD': 'N$', 'USD': '$', 'EUR': '\u20ac'}
     currency_symbol = currency_symbols.get(po.currency, po.currency)
     
-    # Build the PDF preview URL (to download)
-    pdf_url = reverse("inventory:po_document_preview", args=[pk])
+    # Sender info
+    user = request.user
+    sender_name = user.get_full_name() or user.username
+    user_email = user.email if user.is_authenticated else ''
+    if not user_email and user.is_authenticated:
+        from tenants.models import UserSite
+        us = UserSite.objects.filter(user=user).first()
+        if us and us.email:
+            user_email = us.email
     
-    # Build filename
-    filename = f"PO-{po.po_number}.pdf"
-    
-    # Build mailto link
+    pdf_filename = f"PO-{po.po_number}.pdf"
     subject = f"Purchase Order PO-{po.po_number}"
-    body = f"""Dear {po.supplier.contact_person or po.supplier.name or 'Supplier'},
-
-Please find attached Purchase Order PO-{po.po_number}.
-
-Order Date: {po.order_date.strftime('%d-%m-%Y') if po.order_date else 'N/A'}
-Due Date: {po.due_date.strftime('%d-%m-%Y') if po.due_date else 'N/A'}
-Total Amount: {currency_symbol} {po.total_amount:,.2f}
-
-Please confirm receipt and acceptance of this order.
-
-Kind regards,
-{company.name}"""
-    
-    mailto_url = f"mailto:{supplier_email}?subject={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
-    
-    # Return HTML that:
-    # 1. Downloads the PDF via hidden link click
-    # 2. Opens the mailto link
-    # 3. Shows instructions
-    return HttpResponse(
-        f"""
-        <html>
-        <head>
-            <title>Email Purchase Order</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; padding: 40px; text-align: center; background: #f5f5f5; }}
-                .container {{ background: white; padding: 30px; border-radius: 8px; max-width: 500px; margin: 0 auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
-                h2 {{ color: #417690; margin-bottom: 20px; }}
-                .step {{ text-align: left; margin: 15px 0; padding: 10px; background: #f9f9f9; border-radius: 4px; }}
-                .step-num {{ display: inline-block; width: 24px; height: 24px; background: #417690; color: white; border-radius: 50%; text-align: center; line-height: 24px; margin-right: 10px; font-size: 12px; }}
-                .filename {{ font-family: monospace; background: #e8e8e8; padding: 2px 6px; border-radius: 3px; }}
-                .close-btn {{ margin-top: 20px; padding: 10px 20px; background: #417690; color: white; border: none; border-radius: 4px; cursor: pointer; }}
-                .close-btn:hover {{ background: #205067; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h2>📧 Email Purchase Order</h2>
-                <p>Your email client is opening with the PO details.</p>
-                
-                <div class="step">
-                    <span class="step-num">1</span>
-                    PDF downloading: <span class="filename">{filename}</span>
-                </div>
-                <div class="step">
-                    <span class="step-num">2</span>
-                    Email opening with subject and body pre-filled
-                </div>
-                <div class="step">
-                    <span class="step-num">3</span>
-                    Attach the downloaded PDF to the email
-                </div>
-                
-                <button class="close-btn" onclick="window.close()">Close Window</button>
-            </div>
-            
-            <script>
-                // Step 1: Download PDF
-                var downloadUrl = "{pdf_url}";
-                var link = document.createElement('a');
-                link.href = downloadUrl;
-                link.download = "{filename}";
-                link.target = "_blank";
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                // Step 2: Open mailto after short delay
-                setTimeout(function() {{
-                    window.location.href = "{mailto_url}";
-                }}, 1000);
-                
-                // Auto-close after 10 seconds
-                setTimeout(function() {{
-                    window.close();
-                }}, 10000);
-            </script>
-        </body>
-        </html>
-        """,
-        content_type="text/html"
+    body_text = (
+        f"Dear {po.supplier.contact_person or po.supplier.name or 'Supplier'},\n\n"
+        f"Please find attached Purchase Order PO-{po.po_number}.\n\n"
+        f"Order Date: {po.order_date.strftime('%d-%m-%Y') if po.order_date else 'N/A'}\n"
+        f"Due Date: {po.due_date.strftime('%d-%m-%Y') if po.due_date else 'N/A'}\n"
+        f"Total Amount: {currency_symbol} {po.total_amount:,.2f}\n\n"
+        f"Please confirm receipt and acceptance of this order.\n\n"
+        f"Kind regards,\n"
+        f"{sender_name}\n"
+        f"{company.name}"
     )
+    
+    # Generate the PDF
+    try:
+        from django.test import RequestFactory
+        factory = RequestFactory()
+        pdf_request = factory.get(reverse("inventory:po_document_preview", args=[pk]))
+        pdf_request.user = request.user
+        pdf_response = po_document_preview(pdf_request, pk)
+        
+        if pdf_response.status_code != 200:
+            return HttpResponse("Error generating PDF", status=500)
+        pdf_content = pdf_response.content
+    except Exception as e:
+        logger.exception('Failed to generate PO PDF for email')
+        return HttpResponse(f"Error generating PDF: {e}", status=500)
+    
+    # Build mailto link and PDF data URI
+    mailto_link = f"mailto:{quote(supplier_email)}?subject={quote(subject)}&body={quote(body_text)}"
+    pdf_b64 = base64.b64encode(pdf_content).decode()
+    safe_filename = escape(pdf_filename)
+    
+    html = (
+        '<!DOCTYPE html><html><head>'
+        '<title>Email Purchase Order</title>'
+        '</head><body style="font-family:Arial,sans-serif;text-align:center;padding:50px;">'
+        f'<h2>\U0001f4e7 Opening your email client...</h2>'
+        f'<p style="font-size:16px;">The PDF <b>{safe_filename}</b> is downloading.<br>'
+        'Please <b>attach</b> it to the email that just opened.</p>'
+        '<p style="margin-top:30px;">'
+        f'<a id="mailto-link" href="{mailto_link}" style="margin-right:15px;">\U0001f4e8 Open email again</a>'
+        f'<a id="pdf-link" href="data:application/pdf;base64,{pdf_b64}" '
+        f'download="{safe_filename}">\U0001f4c4 Download PDF again</a>'
+        '</p>'
+        '<script>'
+        'document.getElementById("pdf-link").click();'
+        'setTimeout(function(){window.location.href=document.getElementById("mailto-link").href;},800);'
+        'setTimeout(function(){window.close();},8000);'
+        '</script>'
+        '</body></html>'
+    )
+    return HttpResponse(html, content_type='text/html')
 

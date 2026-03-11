@@ -307,6 +307,10 @@ class HQUserSiteAdmin(ArchivableAdmin):
             'fields': ('hq_username', 'hq_password'),
             'description': 'HQ login credentials. Hq_username must be unique. Password will be encrypted with PBKDF2.'
         }),
+        ('Contact', {
+            'fields': ('email',),
+            'description': 'Email address used as Reply-To when this user sends documents (invoices, POs, etc).'
+        }),
         ('Timestamps', {
             'fields': ('created_on', 'updated_on'),
             'classes': ('collapse',)

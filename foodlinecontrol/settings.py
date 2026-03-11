@@ -175,6 +175,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
+# ============================================================================
+# EMAIL - opens user's email client (Outlook etc) with PDF attached
+# No SMTP config needed - mailto: link approach
+# ============================================================================
+
 # Login URL - redirect to admin login
 LOGIN_URL = '/admin/login/'
 LOGIN_REDIRECT_URL = '/admin/'  # Changed from /hq/ to break redirect loop

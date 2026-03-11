@@ -267,40 +267,34 @@ def create_picking_slip_on_billing_save(sender, instance, created, **kwargs):
 
             pdf_path = docx_path.replace(".docx", ".pdf")
             
-            # LibreOffice paths to try (Linux first, then Windows for local dev)
-            libreoffice_paths = [
-                "/usr/bin/libreoffice",
-                "/usr/bin/soffice",
-                "/opt/libreoffice/program/soffice",
-                "libreoffice",
-                "soffice",
-                r"C:\Program Files\LibreOffice\program\soffice.exe",
-                r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
-            ]
-            
-            libreoffice_path = None
-            for path in libreoffice_paths:
-                if os.path.exists(path):
-                    libreoffice_path = path
-                    break
+            # Use shared LibreOffice finder (checks system + userspace installs)
+            from .docx_to_pdf import _find_libreoffice
+            libreoffice_path = _find_libreoffice()
             
             if not libreoffice_path:
-                logger.warning('LibreOffice not found - cannot generate picking slip PDF')
-                return
-
-            cmd = [
-                libreoffice_path,
-                "--headless",
-                "--convert-to",
-                "pdf",
-                "--outdir",
-                os.path.dirname(pdf_path),
-                docx_path,
-            ]
-            result = run(cmd, capture_output=True, encoding='utf-8', errors='replace', timeout=30)
-            if result.returncode != 0:
-                os.unlink(docx_path)
-                return
+                # Fallback: try weasyprint conversion
+                try:
+                    from .docx_to_pdf import _convert_with_weasyprint
+                    _convert_with_weasyprint(docx_path, pdf_path)
+                    logger.info('Picking slip PDF generated via weasyprint fallback')
+                except Exception as e:
+                    logger.warning('No PDF converter available for picking slip: %s', e)
+                    os.unlink(docx_path)
+                    return
+            else:
+                cmd = [
+                    libreoffice_path,
+                    "--headless",
+                    "--convert-to",
+                    "pdf",
+                    "--outdir",
+                    os.path.dirname(pdf_path),
+                    docx_path,
+                ]
+                result = run(cmd, capture_output=True, encoding='utf-8', errors='replace', timeout=60)
+                if result.returncode != 0:
+                    os.unlink(docx_path)
+                    return
 
             with open(pdf_path, "rb") as pdf_file:
                 pdf_content = pdf_file.read()

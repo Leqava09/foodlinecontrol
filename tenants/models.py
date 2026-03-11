@@ -158,6 +158,12 @@ class UserSite(models.Model):
         blank=True,
         help_text="HQ login password (encrypted with PBKDF2). Only for HQ users."
     )
+    email = models.EmailField(
+        max_length=254,
+        blank=True,
+        default='',
+        help_text="User's email address. Used as Reply-To when sending documents."
+    )
     is_manager = models.BooleanField(
         default=False,
         help_text="Site Manager"

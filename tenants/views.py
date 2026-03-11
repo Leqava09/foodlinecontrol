@@ -89,9 +89,15 @@ def hq_login(request):
             user_site.user = django_user
             user_site.save()
         
-        # Update the existing user's display name to show HQ username
+        # Update the existing user's display name and email to match UserSite
+        needs_save = False
         if django_user.first_name != hq_username:
             django_user.first_name = hq_username
+            needs_save = True
+        if user_site.email and django_user.email != user_site.email:
+            django_user.email = user_site.email
+            needs_save = True
+        if needs_save:
             django_user.save()
         
         # Login the user manually (create session)
