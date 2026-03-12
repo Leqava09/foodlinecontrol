@@ -1748,6 +1748,7 @@ class BillingDocumentHeaderAdmin(SiteAwareModelAdmin, ArchivableAdmin):
             'fields': (('transporters', 'transport_cost'),),
         }),
         ("Documents", {
+            'classes': ('documents-section',),
             'fields': (
                 ('create_quote', 'view_quote', 'email_quote'),
                 ('create_proforma', 'view_proforma', 'email_proforma'),

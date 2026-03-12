@@ -727,6 +727,7 @@ class HQBillingDocumentHeaderAdmin(BillingDocumentHeaderAdmin):
             'fields': (('transporters', 'transport_cost'), 'dispatched'),
         }),
         ("Documents", {
+            'classes': ('documents-section',),
             'fields': (
                 ('create_quote', 'view_quote', 'email_quote'),
                 ('create_proforma', 'view_proforma', 'email_proforma'),
@@ -758,6 +759,7 @@ class HQBillingDocumentHeaderAdmin(BillingDocumentHeaderAdmin):
             'fields': (('transporters', 'transport_cost'), 'dispatched'),
         }),
         ("Documents", {
+            'classes': ('documents-section',),
             'fields': (
                 ('create_quote', 'view_quote', 'email_quote'),
                 ('create_proforma', 'view_proforma', 'email_proforma'),
@@ -789,6 +791,7 @@ class HQBillingDocumentHeaderAdmin(BillingDocumentHeaderAdmin):
             'fields': (('transporters', 'transport_cost'), 'dispatched'),
         }),
         ("Documents", {
+            'classes': ('documents-section',),
             'fields': (
                 ('create_quote', 'view_quote', 'email_quote'),
                 ('create_proforma', 'view_proforma', 'email_proforma'),
@@ -820,6 +823,7 @@ class HQBillingDocumentHeaderAdmin(BillingDocumentHeaderAdmin):
             'fields': (('transporters', 'transport_cost'), 'dispatched'),
         }),
         ("Documents", {
+            'classes': ('documents-section',),
             'fields': (
                 ('create_quote', 'view_quote', 'email_quote'),
                 ('create_proforma', 'view_proforma', 'email_proforma'),

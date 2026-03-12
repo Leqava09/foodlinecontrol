@@ -58,3 +58,58 @@ div.field-batch_costings,
     height: 0 !important;
     overflow: hidden !important;
 }
+
+/* Documents section - align eye and envelope icon columns vertically */
+fieldset.documents-section .grp-row.grp-cells-3 {
+    display: flex !important;
+    align-items: center;
+}
+
+fieldset.documents-section .grp-row.grp-cells-3 .grp-cell {
+    display: block !important;
+    padding: 8px 0 8px 0 !important;
+    white-space: nowrap;
+    border: none !important;
+}
+
+fieldset.documents-section .grp-row.grp-cells-3 .grp-cell:first-child {
+    flex: 0 0 290px !important;
+    min-width: 290px !important;
+    max-width: 290px !important;
+}
+
+fieldset.documents-section .grp-row.grp-cells-3 .grp-cell:nth-child(2) {
+    flex: 0 0 50px !important;
+    text-align: center;
+}
+
+fieldset.documents-section .grp-row.grp-cells-3 .grp-cell:nth-child(3) {
+    flex: 0 0 50px !important;
+    text-align: center;
+}
+
+/* Remove faint boxes around readonly eye/envelope icons */
+fieldset.documents-section .grp-row.grp-cells-3 .grp-cell div.grp-readonly {
+    border: none !important;
+    background: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+}
+
+/* Remove inner label column for readonly icon cells (eyes & envelopes) */
+fieldset.documents-section .grp-row.grp-cells-3 .grp-cell:nth-child(2) .c-1,
+fieldset.documents-section .grp-row.grp-cells-3 .grp-cell:nth-child(3) .c-1 {
+    display: none !important;
+}
+
+fieldset.documents-section .grp-row.grp-cells-3 .grp-cell:nth-child(2) .c-2,
+fieldset.documents-section .grp-row.grp-cells-3 .grp-cell:nth-child(3) .c-2 {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Keep checkbox labels on one line */
+fieldset.documents-section .grp-row.grp-cells-3 .grp-cell .c-2 label {
+    white-space: nowrap !important;
+}
