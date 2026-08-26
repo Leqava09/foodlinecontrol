@@ -316,7 +316,7 @@ class BatchCosting(models.Model):
         decimal_places=2,
         default=0,
         verbose_name="Selling Price",
-        help_text="Selling Price = stock price incl VAT + overhead per unit + salary per unit + investor/loan per unit + markup.",
+        help_text="Selling Price = stock price excl VAT + overhead per unit + salary per unit + investor/loan per unit + markup.",
     )
     use_markup = models.BooleanField(
         default=False,
@@ -901,7 +901,7 @@ class ProductCosting(models.Model):
         default=0,
         verbose_name="Selling Price",
         help_text=(
-            "Selling Price = Total stock items incl. VAT "
+            "Selling Price = Total stock items excl. VAT "
             "+ Overhead price per unit + Salary price per unit "
             "+ Investor/Loan price per unit "
             "+ Markup (% or fixed per unit)."
@@ -1257,8 +1257,12 @@ class BillingDocumentHeader(models.Model):
         
         if self.qty_for_invoice_data:
             errors = {}
-            
-            for batch_number, qty in self.qty_for_invoice_data.items():
+            qty_mapping = (
+                self.qty_for_invoice_data.get('qty_mapping', {})
+                if isinstance(self.qty_for_invoice_data, dict) and 'qty_mapping' in self.qty_for_invoice_data
+                else self.qty_for_invoice_data
+            )
+            for batch_number, qty in qty_mapping.items():
                 
                 if qty is None or qty == '' or qty == 'null':
                     continue
@@ -1371,7 +1375,6 @@ class BillingDocumentHeader(models.Model):
             
             for batch in batches:
                 batch_number = batch.batch_number
-                qty = self.qty_for_invoice_data.get(batch_number)
                 
                 if not qty:
                     continue

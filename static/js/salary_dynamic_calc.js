@@ -43,21 +43,21 @@
             var $perHourCell = $row.find('.total_per_hour_display');
             console.log('Per hour cell found:', $perHourCell.length);
             if ($perHourCell.length) {
-                $perHourCell.text('NAD ' + totalPerHour.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $perHourCell.text((window.COMPANY_CURRENCY || 'R') + ' ' + totalPerHour.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
             }
             
             var $perMonthCell = $row.find('.total_per_month_display');
             console.log('Per month cell found:', $perMonthCell.length);
             if ($perMonthCell.length) {
-                $perMonthCell.text('NAD ' + totalPerMonth.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $perMonthCell.text((window.COMPANY_CURRENCY || 'R') + ' ' + totalPerMonth.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
             }
             
             console.log('Calculated position:', prefix, 'perHour:', totalPerHour, 'perMonth:', totalPerMonth);
         }
-        // Helper to parse SA-formatted numbers like "NAD 19 200,00" -> 19200.00
+        // Helper to parse SA-formatted numbers like "R 19 200,00" or "NAD 19 200,00" -> 19200.00
         function parseSANumber(text) {
-            // Remove currency prefix and trim
-            var clean = text.replace(/^[A-Z]{3}\s*/i, '').trim();
+            // Remove any leading currency symbol/code, regardless of length (e.g. "R", "NAD", "$")
+            var clean = text.replace(/^[^\d\-]+/, '').trim();
             // Remove spaces (thousands separator)
             clean = clean.replace(/\s/g, '');
             // Replace comma with period (decimal separator)
@@ -107,25 +107,25 @@
             // Update Fixed subtotal display
             var $fixedDisplay = $('#salary-fixed-total');
             if ($fixedDisplay.length) {
-                $fixedDisplay.text('NAD ' + fixedSubtotal.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $fixedDisplay.text((window.COMPANY_CURRENCY || 'R') + ' ' + fixedSubtotal.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
             }
             
             // Update Production subtotal display
             var $productionDisplay = $('#salary-production-total');
             if ($productionDisplay.length) {
-                $productionDisplay.text('NAD ' + productionSubtotal.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $productionDisplay.text((window.COMPANY_CURRENCY || 'R') + ' ' + productionSubtotal.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
             }
             
             // Update Grand Total display
             var $grandDisplay = $('#salary-grand-total');
             if ($grandDisplay.length) {
-                $grandDisplay.text('NAD ' + grandTotal.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $grandDisplay.text((window.COMPANY_CURRENCY || 'R') + ' ' + grandTotal.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
             }
             
             // Update Price per Unit display (value only, help text is static)
             var $priceDisplay = $('#salary-price-per-unit');
             if ($priceDisplay.length) {
-                var priceText = 'NAD ' + pricePerUnit.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                var priceText = (window.COMPANY_CURRENCY || 'R') + ' ' + pricePerUnit.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                 $priceDisplay.text(priceText);
             }
             

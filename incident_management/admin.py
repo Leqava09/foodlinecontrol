@@ -25,7 +25,7 @@ class IncidentAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         js = ('js/production_date_fix.js',)
 
     list_display = [
-        'id', 'incident_date', 'batch', 'location',
+        'incident_number', 'incident_date', 'batch', 'location',
         'investigation_start', 'investigation_end', 'report_date',
         'responsible_person', 'management_person'
     ]
@@ -34,6 +34,35 @@ class IncidentAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     readonly_fields = ['created']
     inlines = [IncidentAttachmentInline]
     
+    def display_site(self, obj):
+        """
+        The 'site' FK is intentionally always NULL for HQ-context incidents
+        (both direct-created and imported), so the raw field always shows
+        '-'. Show the meaningful site instead, in priority order:
+        1. import_source_site (set when this incident was imported from a site)
+        2. batch.site (the site the selected production batch belongs to)
+        3. site (in the rare case it's actually set, e.g. site-context incidents)
+        """
+        if obj.import_source_site:
+            return obj.import_source_site.name
+        if obj.batch and obj.batch.site:
+            return obj.batch.site.name
+        if obj.site:
+            return obj.site.name
+        return "-"
+    display_site.short_description = "Site"
+
+    def get_list_display(self, request):
+        """
+        SiteAwareModelAdmin.get_list_display() auto-appends the raw 'site'
+        field in HQ context. Swap it for display_site so the column shows
+        the actual originating site instead of always '-'.
+        """
+        list_display = list(super().get_list_display(request))
+        if 'site' in list_display:
+            list_display[list_display.index('site')] = 'display_site'
+        return list_display
+
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [

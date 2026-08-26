@@ -994,20 +994,42 @@ from incident_management.models import Incident
 from incident_management.admin import IncidentAdmin
 
 class HQIncidentDirectForm(forms.ModelForm):
-    """
-    Form for creating HQ incidents directly (not imported).
-    Includes 'site' field for batch filtering only (not saved).
-    """
+    production_date = forms.DateField(
+        required=True,
+        input_formats=["%d-%m-%Y", "%Y-%m-%d"],
+        widget=forms.DateInput(format="%d-%m-%Y", attrs={"class": "vDateField"}),
+    )
+    incident_date = forms.DateField(
+        required=True,
+        input_formats=["%d-%m-%Y", "%Y-%m-%d"],
+        widget=forms.DateInput(format="%d-%m-%Y", attrs={"class": "vDateField"}),
+    )
+    investigation_start = forms.DateField(
+        required=True,
+        input_formats=["%d-%m-%Y", "%Y-%m-%d"],
+        widget=forms.DateInput(format="%d-%m-%Y", attrs={"class": "vDateField"}),
+    )
+    investigation_end = forms.DateField(
+        required=True,
+        input_formats=["%d-%m-%Y", "%Y-%m-%d"],
+        widget=forms.DateInput(format="%d-%m-%Y", attrs={"class": "vDateField"}),
+    )
+    report_date = forms.DateField(
+        required=True,
+        input_formats=["%d-%m-%Y", "%Y-%m-%d"],
+        widget=forms.DateInput(format="%d-%m-%Y", attrs={"class": "vDateField"}),
+    )
+
     site = forms.ModelChoiceField(
         queryset=None,
         required=False,
-        help_text="Used for batch filtering only (not saved). Select a site to filter batches."
+        help_text="Used for batch filtering only (not saved). Select a site to filter batches.",
     )
-    
+
     class Meta:
         model = Incident
         fields = [
-            'site',  # For batch filtering only, not saved
+            'site',
             'production_date',
             'batch',
             'incident_date',

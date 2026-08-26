@@ -300,6 +300,23 @@ class ImportBillingForm(forms.ModelForm):
         }),
         help_text="Invoice number from selected site"
     )
+
+    billing_date = forms.DateField(
+        required=True,
+        input_formats=DATE_INPUTS,
+        widget=forms.DateInput(
+            format="%d-%m-%Y",
+            attrs={'class': 'vDateField', 'size': 10}
+        ),
+    )
+    due_date = forms.DateField(
+        required=True,
+        input_formats=DATE_INPUTS,
+        widget=forms.DateInput(
+            format="%d-%m-%Y",
+            attrs={'class': 'vDateField', 'size': 10}
+        ),
+    )
     
     base_number = forms.CharField(
         required=True,
@@ -333,14 +350,6 @@ class ImportBillingForm(forms.ModelForm):
                 'class': 'vSelect',
                 'style': 'max-width: 200px;',  # Even smaller
             }),
-            'billing_date': forms.DateInput(
-                format='%d/%m/%Y',
-                attrs={'class': 'vDateField', 'size': 10}
-            ),
-            'due_date': forms.DateInput(
-                format='%d/%m/%Y',
-                attrs={'class': 'vDateField', 'size': 10}
-            ),
             'qty_for_invoice_data': forms.Textarea(),
         }
     
@@ -355,10 +364,21 @@ class ImportBillingForm(forms.ModelForm):
         
         # Setup delivery_institution field with dynamic filtering
         if 'delivery_institution' in self.fields:
-            # If editing existing object with a client, filter by that client
+            client_id = None
+            # Editing an existing record with a client already set
             if self.instance.pk and self.instance.client_id:
+                client_id = self.instance.client_id
+            # Form was submitted (POST) - use the client the user actually picked,
+            # so the JS-populated dropdown value validates correctly
+            elif self.is_bound:
+                try:
+                    client_id = int(self.data.get('client') or 0) or None
+                except (TypeError, ValueError):
+                    client_id = None
+
+            if client_id:
                 self.fields['delivery_institution'].queryset = DeliverySite.objects.filter(
-                    client=self.instance.client
+                    client_id=client_id
                 ).order_by('institutionname')
             else:
                 # Empty queryset initially (will be populated by client selection)
@@ -381,11 +401,11 @@ class ImportBillingForm(forms.ModelForm):
         cleaned_data = super().clean()
         invoice_number = cleaned_data.get('invoice_number')
         site = cleaned_data.get('site')
-        
+
         # Skip validation when editing existing import
         if self.instance and self.instance.pk:
             return cleaned_data
-        
+
         if invoice_number and site:
             # Check if this invoice number exists in this site
             exists = BillingDocumentHeader.objects.filter(
@@ -397,7 +417,14 @@ class ImportBillingForm(forms.ModelForm):
                     f"Invoice number '{invoice_number}' not found for {site.name}. "
                     f"Make sure you selected the correct site and invoice number."
                 )
-        
+
+        # Set import tracking on the instance NOW so model.clean() sees it
+        # during full_clean() — form.save() runs too late for that.
+        if site:
+            self.instance.import_source_site = site
+        if invoice_number:
+            self.instance.import_source_invoice_number = invoice_number
+
         return cleaned_data
     
     def save(self, commit=True):

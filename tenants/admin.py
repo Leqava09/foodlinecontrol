@@ -13,4 +13,3 @@ from .models import Site, UserSite
 # DO NOT register Site or UserSite here!
 # They are registered in hq_admin.py with the HQ admin site.
 # This ensures they don't appear in the regular /admin/ at all.
-

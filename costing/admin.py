@@ -42,13 +42,15 @@ from tenants.admin_utils import SiteAwareModelAdmin
 
 DATE_INPUTS_BILLING = ["%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y"]
 
-def get_company_currency():
-    # Note: Admin list views don't have direct site context; default to HQ company (site=NULL)
-    # In ModelAdmin methods with request context, use: CompanyDetails.objects.filter(site=request.current_site, is_active=True).first()
+def get_company_currency(site=None):
+    """Resolve the display currency for a given site/tenant.
+    Falls back to the HQ-level company (site=None), then to 'R'."""
+    if site is not None:
+        company = CompanyDetails.objects.filter(site=site, is_active=True).first()
+        if company and company.currency:
+            return company.currency
     company = CompanyDetails.objects.filter(site__isnull=True, is_active=True).first()
-    if company and company.currency:
-        return company.currency
-    return "R"
+    return company.currency if company and company.currency else "R"
     
 class OverheadItemInline(admin.TabularInline):
     model = OverheadItem
@@ -71,28 +73,28 @@ class OverheadItemInline(admin.TabularInline):
     def per_week_display(self, obj):
         if not obj.id:
             return "-"
-        cur = get_company_currency()
+        cur = get_company_currency(obj.header.site)
         value = f"{cur} {float(obj.per_week):,.2f}"
         return format_html('<span style="float:right;">{}</span>', value)
 
     def per_day_display(self, obj):
         if not obj.id:
             return "-"
-        cur = get_company_currency()
+        cur = get_company_currency(obj.header.site)
         value = f"{cur} {float(obj.per_day):,.2f}"
         return format_html('<span style="float:right;">{}</span>', value)
 
     def per_hour_display(self, obj):
         if not obj.id:
             return "-"
-        cur = get_company_currency()
+        cur = get_company_currency(obj.header.site)
         value = f"{cur} {float(obj.per_hour):,.2f}"
         return format_html('<span style="float:right;">{}</span>', value)
 
     def per_unit_display(self, obj):
         if not obj.id:
             return "-"
-        cur = get_company_currency()
+        cur = get_company_currency(obj.header.site)
         value = f"{cur} {float(obj.per_unit):,.4f}"
         return format_html('<span style="float:right;">{}</span>', value)
 
@@ -116,23 +118,34 @@ class OverheadCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         """Prefetch related items for efficient calculation of totals"""
         qs = super().get_queryset(request)
         return qs.prefetch_related('items')
+        
+    def change_view(self, request, object_id=None, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        obj = self.get_object(request, object_id) if object_id else None
+        currency = get_company_currency(obj.site if obj else getattr(request, 'current_site', None))
+        response = super().change_view(request, object_id, form_url, extra_context)
+        if hasattr(response, 'render'):
+            response.render()
+            script_tag = f'<script>window.COMPANY_CURRENCY = "{currency}";</script>'.encode('utf-8')
+            response.content = response.content.replace(b'</head>', script_tag + b'</head>')
+        return response
 
     def fixed_subtotal_display(self, obj):
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         value = float(obj.fixed_subtotal) if obj.fixed_subtotal else 0.0
         formatted = f"{cur} {value:,.2f}"
         return format_html('<span id="overhead-fixed-total">{}</span>', formatted)
     fixed_subtotal_display.short_description = "Fixed"
 
     def variable_subtotal_display(self, obj):
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         value = float(obj.variable_subtotal) if obj.variable_subtotal else 0.0
         formatted = f"{cur} {value:,.2f}"
         return format_html('<span id="overhead-variable-total">{}</span>', formatted)
     variable_subtotal_display.short_description = "Variable"
 
     def grand_total_display(self, obj):
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         value = float(obj.grand_total) if obj.grand_total else 0.0
         color = "darkred" if value > 100000 else "black"
         formatted = f"{cur} {value:,.2f}"
@@ -140,7 +153,7 @@ class OverheadCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     grand_total_display.short_description = "Grand Total"
 
     def price_per_unit_display(self, obj):
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         value = float(obj.price_per_unit) if obj.price_per_unit else 0.0
         formatted = f"{cur} {value:,.2f}" if value > 0 else "-"
         return format_html('<span id="overhead-price-per-unit">{}</span>', formatted)
@@ -195,7 +208,7 @@ class InvestorLoanItemInline(admin.TabularInline):
     def per_unit_display(self, obj):
         if not obj.id:
             return "-"
-        cur = get_company_currency()
+        cur = get_company_currency(obj.header.site)
         value = f"{cur} {float(obj.per_unit):,.4f}"
         return format_html('<span style="float:right;">{}</span>', value)
     per_unit_display.short_description = "Per Unit"
@@ -220,21 +233,21 @@ class InvestorLoanCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         return qs.prefetch_related('items')
 
     def investment_subtotal_display(self, obj):
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         value = float(obj.investment_subtotal) if obj.investment_subtotal else 0.0
         formatted = f"{cur} {value:,.2f}"
         return format_html('<span id="investor-loan-investment-total">{}</span>', formatted)
     investment_subtotal_display.short_description = "Investment"
 
     def loan_subtotal_display(self, obj):
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         value = float(obj.loan_subtotal) if obj.loan_subtotal else 0.0
         formatted = f"{cur} {value:,.2f}"
         return format_html('<span id="investor-loan-loan-total">{}</span>', formatted)
     loan_subtotal_display.short_description = "Loan"
 
     def grand_total_display(self, obj):
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         value = float(obj.grand_total) if obj.grand_total else 0.0
         color = "darkred" if value > 100000 else "black"
         formatted = f"{cur} {value:,.2f}"
@@ -242,7 +255,7 @@ class InvestorLoanCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     grand_total_display.short_description = "Grand Total"
 
     def price_per_unit_display(self, obj):
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         value = float(obj.price_per_unit) if obj.price_per_unit else 0.0
         formatted = f"{cur} {value:,.2f}" if value > 0 else "-"
         return format_html('<span id="investor-loan-price-per-unit">{}</span>', formatted)
@@ -299,7 +312,7 @@ class SalaryPositionInline(admin.TabularInline):
     def total_per_hour_display(self, obj):
         if not obj.id:
             return "-"
-        cur = get_company_currency()
+        cur = get_company_currency(obj.header.site)
         value = f"{cur} {float(obj.total_per_hour):,.2f}"
         return value
     total_per_hour_display.short_description = "Per Hour"
@@ -307,7 +320,7 @@ class SalaryPositionInline(admin.TabularInline):
     def total_per_month_display(self, obj):
         if not obj.id:
             return "-"
-        cur = get_company_currency()
+        cur = get_company_currency(obj.header.site)
         value = f"{cur} {float(obj.total_per_month):,.2f}"
         return value
     total_per_month_display.short_description = "Total for Month"
@@ -350,21 +363,21 @@ class SalaryCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         return qs.prefetch_related('positions')
 
     def fixed_subtotal_display(self, obj):
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         value = float(obj.fixed_subtotal or 0)
         formatted = f"{cur} {value:,.2f}"
         return format_html('<div style="text-align:center;"><span id="salary-fixed-total">{}</span></div>', formatted)
     fixed_subtotal_display.short_description = "Fixed subtotal"
 
     def production_subtotal_display(self, obj):
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         value = float(obj.production_subtotal or 0)
         formatted = f"{cur} {value:,.2f}"
         return format_html('<div style="text-align:center;"><span id="salary-production-total">{}</span></div>', formatted)
     production_subtotal_display.short_description = "Production subtotal"
 
     def grand_total_display(self, obj):
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         value = float(obj.grand_total or 0)
         color = "darkred" if value > 100000 else "black"
         formatted = f"{cur} {value:,.2f}"
@@ -372,7 +385,7 @@ class SalaryCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     grand_total_display.short_description = "Grand Total"
 
     def price_per_unit_display(self, obj):
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         
         value = float(obj.price_per_unit or 0)
         formatted = f"{cur} {value:,.2f}" if value > 0 else "-"
@@ -384,16 +397,27 @@ class SalaryCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         return html
     price_per_unit_display.short_description = "Price per Unit"
     def management_salary_display(self, obj):
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         value = float(obj.management_salary or 0)
         return f"{cur} {value:,.2f}"
     management_salary_display.short_description = "Management"
 
     def office_salary_display(self, obj):
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         value = float(obj.office_salary or 0)
         return f"{cur} {value:,.2f}"
     office_salary_display.short_description = "Office"
+    
+    def change_view(self, request, object_id=None, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        obj = self.get_object(request, object_id) if object_id else None
+        currency = get_company_currency(obj.site if obj else getattr(request, 'current_site', None))
+        response = super().change_view(request, object_id, form_url, extra_context)
+        if hasattr(response, 'render'):
+            response.render()
+            script_tag = f'<script>window.COMPANY_CURRENCY = "{currency}";</script>'.encode('utf-8')
+            response.content = response.content.replace(b'</head>', script_tag + b'</head>')
+        return response
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
@@ -592,6 +616,8 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         if not approvals:
             return "No batch approvals found"
 
+        cur = escape(get_company_currency(obj.site))
+
         # Try get Waste record for this production date
         waste = None
         if obj.production_date:
@@ -651,9 +677,10 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
                         {ready_for_dispatch:,.0f}
                     </td>
                     <td style="border: 1px solid #ddd; padding: 10px; text-align: right; width: 150px;">
+                        <span style="margin-right: 4px; font-weight: bold;">{cur}</span>
                         <input type="text" value="{float(approval.batch_price_per_unit or 0):.2f}"
                                data-approval-id="{approval.id}" class="batch-price-input"
-                               style="width: 100%; padding: 5px; text-align: right;">
+                               style="width: 70%; padding: 5px; text-align: right;">
                     </td>
                     <td style="border: 1px solid #ddd; padding: 10px; text-align: center; width: 80px;">
                         <input type="checkbox" data-approval-id="{approval.id}" class="batch-approval-checkbox"
@@ -687,12 +714,6 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
 
     batch_approvals_display.short_description = ""
 
-    def get_company_currency():
-        company = CompanyDetails.objects.filter(site__isnull=True, is_active=True).first()
-        if company and company.currency:
-            return company.currency
-        return "R"
-
     def batch_prices_full_table_display(self, obj):
         """
         Display COMPLETE batch pricing table in LIST VIEW - reads from DB.
@@ -711,7 +732,7 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
             )
 
         # currency for this table
-        cur = escape(get_company_currency())
+        cur = escape(get_company_currency(obj.site))
 
         # Try get Waste data for Ready Dispatch
         try:
@@ -820,7 +841,7 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         """Display overhead price per unit - uses snapshot if available"""
         if not obj:
             return "-"
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         # Use the model's property which handles snapshot logic
         value = obj.overhead_price_per_unit
         if value == 0 and not obj.overhead_costing:
@@ -832,7 +853,7 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         """Display salary price per unit - uses snapshot if available"""
         if not obj:
             return "-"
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         # Use the model's property which handles snapshot logic
         value = obj.salary_price_per_unit
         if value == 0 and not obj.salary_costing:
@@ -844,7 +865,7 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         """Display investor/loan price per unit - uses snapshot if available"""
         if not obj:
             return "-"
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         # Use the model's property which handles snapshot logic
         value = obj.investor_loan_price_per_unit
         if value == 0 and not obj.investor_loan_costing:
@@ -885,7 +906,7 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     def stock_item_price_display(self, obj):
         if not obj:
             return "-"
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         price = float(obj.stock_item_price_use or 0)
         return format_html('<strong>{} {:,.2f}</strong>', cur, price)
     stock_item_price_display.short_description = "Stock Item Price"
@@ -893,7 +914,7 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     def costing_summary_display(self, obj):
         if not obj:
             return "No data"
-        cur = escape(get_company_currency())
+        cur = escape(get_company_currency(obj.site))
         inv = float(obj.cost_per_unit_inventory or 0)
         oh = float(obj.overhead_price_per_unit or 0)
         sal = float(obj.salary_price_per_unit or 0)
@@ -956,7 +977,7 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     def total_cost_per_unit_display(self, obj):
         if not obj:
             return "-"
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         value = float(obj.total_cost_per_unit or 0)
         return format_html(
             '<strong style="color: #d32f2f; font-size: 14px;">{} {:,.4f}</strong>',
@@ -1005,11 +1026,14 @@ class BatchCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
     production_date_display.short_description = "Production Date"
     
     def change_view(self, request, object_id=None, form_url='', extra_context=None):
-        """Ensure BatchPriceApproval records exist before rendering form"""
         extra_context = extra_context or {}
-        
-        # Pass company currency to template for JavaScript
-        extra_context['company_currency'] = get_company_currency()
+        bc = None
+        if object_id:
+            bc = BatchCosting.objects.get(pk=object_id)
+            extra_context['company_currency'] = get_company_currency(bc.site)
+            ...  # rest unchanged, using bc as before
+        else:
+            extra_context['company_currency'] = get_company_currency(getattr(request, 'current_site', None))
         
         if object_id:
             bc = BatchCosting.objects.get(pk=object_id)
@@ -1227,7 +1251,7 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
 
     def total_stock_items_display(self, obj):
         if obj:
-            cur = get_company_currency()
+            cur = get_company_currency(obj.site)
             total = obj.total_stock_items_excl_vat
             return format_html('<strong>{} {:,.2f}</strong>', cur, float(total))
         return "-"
@@ -1235,7 +1259,7 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
 
     def total_stock_items_incl_vat_display(self, obj):
         if obj:
-            cur = get_company_currency()
+            cur = get_company_currency(obj.site)
             total = obj.total_stock_items_incl_vat
             return format_html('<strong>{} {:,.2f}</strong>', cur, float(total))
         return "-"
@@ -1247,7 +1271,7 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         """Display overhead price per unit - uses snapshot if available"""
         if not obj:
             return "-"
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         # Use the model's property which handles snapshot logic
         value = obj.overhead_price_per_unit
         if value == 0 and not obj.overhead_costing:
@@ -1259,7 +1283,7 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         """Display salary price per unit - uses snapshot if available"""
         if not obj:
             return "-"
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         # Use the model's property which handles snapshot logic
         value = obj.salary_price_per_unit
         if value == 0 and not obj.salary_costing:
@@ -1271,7 +1295,7 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         """Display investor/loan price per unit - uses snapshot if available"""
         if not obj:
             return "-"
-        cur = get_company_currency()
+        cur = get_company_currency(obj.site)
         # Use the model's property which handles snapshot logic
         value = obj.investor_loan_price_per_unit
         if value == 0 and not obj.investor_loan_costing:
@@ -1305,8 +1329,14 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
 
     def change_view(self, request, object_id=None, form_url='', extra_context=None):
         extra_context = extra_context or {}
-        extra_context['product_select_disabled'] = True
-        extra_context['company_currency'] = get_company_currency()
+        obj = self.get_object(request, object_id) if object_id else None
+        currency = get_company_currency(obj.site if obj else getattr(request, 'current_site', None))
+        response = super().change_view(request, object_id, form_url, extra_context)
+        if hasattr(response, 'render'):
+            response.render()
+            script_tag = f'<script>window.COMPANY_CURRENCY = "{currency}";</script>'.encode('utf-8')
+            response.content = response.content.replace(b'</head>', script_tag + b'</head>')
+        return response
         
         # For existing records, pass original costing IDs and snapshot values for JS comparison
         if object_id:
@@ -1395,7 +1425,7 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
         if not obj or not obj.product:
             return "Select a product first"
 
-        cur = escape(get_company_currency())
+        cur = escape(get_company_currency(obj.site))
         product = obj.product
         all_items = []
         
@@ -1441,9 +1471,9 @@ class ProductCostingAdmin(SiteAwareModelAdmin, ArchivableAdmin):
                 <td style="border:1px solid #ddd; padding:8px; text-align:center;">{escape(item['unit'])}</td>
                 <td style="border:1px solid #ddd; padding:8px; text-align:right;">{cur} {float(item['price_incl']):,.2f}</td>
                 <td style="border:1px solid #ddd; padding:8px; text-align:right;"><strong>{cur} {float(price_per_unit):,.2f}</strong></td>
-                <td style="border:1px solid #ddd; padding:8px; text-align:right;">
-                    <input type="number" step="0.01" value="{float(price_per_unit):.2f}"
-                           class="use-price-input" data-index="{idx}" style="width:80px;">
+                <td style="border:1px solid #ddd; padding:8px; text-align:right; white-space:nowrap;">
+                    <span style="margin-right:2px; font-weight:bold;">{cur}</span><input type="number" step="0.01" value="{float(price_per_unit):.2f}"
+                           class="use-price-input" data-index="{idx}" style="width:55px;">
                 </td>
                 <td style="border:1px solid #ddd; padding:8px; text-align:center;">
                     <input type="number" step="0.01" value="0"

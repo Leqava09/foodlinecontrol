@@ -1,8 +1,17 @@
-from django.db import models
+from django.db import models, transaction
 from django.core.validators import FileExtensionValidator
 from manufacturing.models import Production, Batch
 
 class Incident(models.Model):
+    # Per-scope sequential number: independent counter for each site,
+    # and a separate independent counter for HQ (site is NULL).
+    incident_number = models.PositiveIntegerField(
+        editable=False,
+        null=True,
+        blank=True,
+        verbose_name="Incident No.",
+    )
+
     site = models.ForeignKey(
         'tenants.Site',
         on_delete=models.CASCADE,
@@ -77,8 +86,28 @@ class Incident(models.Model):
         verbose_name_plural = "Incidents"
         ordering = ['-incident_date', '-created']
 
+    def save(self, *args, **kwargs):
+        """
+        Assign a per-scope sequential incident_number on first save.
+        Each site has its own independent counter; HQ (site is NULL)
+        has its own independent counter too.
+        """
+        if self.incident_number is None:
+            with transaction.atomic():
+                last = (
+                    Incident.objects
+                    .select_for_update()
+                    .filter(site=self.site)
+                    .order_by('-incident_number')
+                    .first()
+                )
+                self.incident_number = (last.incident_number + 1) if last and last.incident_number else 1
+                super().save(*args, **kwargs)
+        else:
+            super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"Incident {self.id} ({self.incident_date}) - Batch: {self.batch}"
+        return f"Incident {self.incident_number} ({self.incident_date}) - Batch: {self.batch}"
 
 class IncidentAttachment(models.Model):
     incident = models.ForeignKey(

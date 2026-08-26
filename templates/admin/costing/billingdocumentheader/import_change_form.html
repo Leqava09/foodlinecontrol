@@ -583,8 +583,8 @@ function populateBatchTable(batchData) {
             <td>${batch.product_name || '-'}</td>
             <td>${batch.size || '-'}</td>
             <td>${batch.qty_for_invoice || '-'}</td>
-            <td>${parseFloat(batch.price_per_unit || 0).toFixed(2)}</td>
-            <td><input type="number" step="0.01" value="${parseFloat(batch.inv_price || 0).toFixed(2)}" placeholder="0.00" style="text-align: right;"></td>
+            <td>${(window.COMPANY_CURRENCY || 'R')} ${parseFloat(batch.price_per_unit || 0).toFixed(2)}</td>
+            <td>${(window.COMPANY_CURRENCY || 'R')} <input type="number" step="0.01" value="${parseFloat(batch.inv_price || 0).toFixed(2)}" placeholder="0.00" style="text-align: right; width: 70%;"></td>
         `;
         tbody.appendChild(row);
     });

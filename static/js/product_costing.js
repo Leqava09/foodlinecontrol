@@ -7,6 +7,19 @@
         }
         const CURRENCY = getCurrency();
 
+        // Add a currency label span before an editable input (e.g. "R" before Markup per Unit)
+        function addCurrencyPrefixLabel(inputEl) {
+            if (!inputEl) return;
+            let currencyLabel = inputEl.previousElementSibling;
+            if (!currencyLabel || !currencyLabel.classList.contains('currency-prefix')) {
+                currencyLabel = document.createElement('span');
+                currencyLabel.classList.add('currency-prefix');
+                currencyLabel.style.cssText = 'margin-right: 5px; font-weight: bold;';
+                inputEl.parentNode.insertBefore(currencyLabel, inputEl);
+            }
+            currencyLabel.textContent = CURRENCY;
+        }
+
         function syncTableWithInline() {
             const htmlTable = document.getElementById('stock-items-table');
 
@@ -113,6 +126,7 @@
                 if (markupPerUnitInput) {
                     markupPerUnitInput.addEventListener('change', calculateTotals);
                     markupPerUnitInput.addEventListener('keyup', calculateTotals);
+                    addCurrencyPrefixLabel(markupPerUnitInput);
                 }
 
                 calculateTotals();
@@ -150,7 +164,7 @@
 
 
             updateDisplayTotals(totalExclVat, totalInclVat);
-            calculateSellingPrice(totalInclVat);
+            calculateSellingPrice(totalExclVat);
         }
 
         function updateDisplayTotals(exclVat, inclVat) {
@@ -182,7 +196,7 @@
             });
         }
 
-        function calculateSellingPrice(totalInclVat) {
+        function calculateSellingPrice(totalExclVat) {
             const form = document.getElementById('productcosting_form');
             if (!form) return;
 
@@ -256,7 +270,7 @@
                 investorLoan = parseFloat(text) || 0;
             }
 
-            const baseCost = totalInclVat + overhead + salary + investorLoan;
+            const baseCost = totalExclVat + overhead + salary + investorLoan;
 
             let sellingPrice = baseCost;
 

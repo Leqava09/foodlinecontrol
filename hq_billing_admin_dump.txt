@@ -1,0 +1,286 @@
+﻿        return '-'
+    get_size.short_description = 'Size'
+    
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == 'site':
+            from tenants.models import Site
+            kwargs['queryset'] = Site.objects.filter(is_active=True)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+class HQBillingDocumentHeaderAdmin(BillingDocumentHeaderAdmin):
+    change_list_template = 'hq_admin/billingdocumentheader_change_list.html'
+    change_form_template = None  # Will be set dynamically in change_view and import_add_view
+    
+    # Add the line items inline (only shown for direct HQ billing, not imports)
+    inlines = [BillingLineItemInline]
+    
+    def get_inlines(self, request, obj):
+        """Only show inline for HQ direct billing, not for imports"""
+        # Don't show inline for import view
+        if getattr(self, '_is_import_view', False):
+            return []
+        # Don't show inline for imported records (editing)
+        if obj and obj.pk and obj.import_source_site:
+            return []
+        # Show inline for HQ direct billing (add and edit)
+        return [BillingLineItemInline]
+    
+    # Override list_display to remove production dates and add import source site
+    list_display = [
+        'base_number',
+        'import_source_site_display',
+        'client',
+        'create_quote',
+        'view_quote',
+        'create_proforma',
+        'view_proforma',
+        'create_invoice',
+        'view_invoice',
+        'create_picking_slip',
+        'view_picking_slip',
+        'create_delivery_note',
+        'view_delivery_note',
+        'date_created',
+    ]
+    
+    # Explicitly define Media to ensure billing_header.js loads (handles billing method radio button behavior)
+    class Media:
+        css = {
+            'all': ('css/custom_admin.css',)
+        }
+        js = ('js/billing_header.js',)
+    
+    # Only client uses autocomplete (transporters uses form queryset filter)
+    autocomplete_fields = ('client',)
+    
+    def import_source_site_display(self, obj):
+        """Display which site this import came from"""
+        if obj.import_source_site:
+            return f"ðŸ“ {obj.import_source_site.name}"
+        return "-"
+    import_source_site_display.short_description = "Imported From Site"
+    
+    def get_list_display(self, request):
+        """Override to ensure only HQ-specific columns are shown, no site field"""
+        return self.list_display
+    
+    # Readonly fields for import view (view and email buttons)
+    import_readonly_fields = [
+        'view_quote', 'email_quote',
+        'view_proforma', 'email_proforma',
+        'view_invoice', 'email_invoice',
+        'view_picking_slip', 'email_picking_slip',
+        'view_delivery_note', 'email_delivery_note',
+    ]
+    
+    def get_import_source_display(self, obj):
+        """Display import source site"""
+        if obj.import_source_site:
+            return f"{obj.import_source_site.name}"
+        return "-"
+    get_import_source_display.short_description = "Imported From"
+    
+    
+    # Fieldsets for HQ direct billing ADD (new records - simple without readonly methods)
+    hq_direct_add_fieldsets = (
+        (None, {
+            'fields': (('client', 'delivery_institution', 'base_number'),),
+        }),
+        ("Dates", {
+            'fields': (('billing_date', 'due_date'),),
+        }),
+        ("Financials", {
+            'fields': (('from_currency', 'to_currency', 'exchange_rate', 'vat_percentage'),),
+        }),
+        ("Billing Method", {
+            'classes': ('billing-method',),   
+            'fields': (('bill_per_primary', 'bill_per_secondary', 'bill_per_pallet'),),
+        }),
+        ("Transport", {
+            'classes': ('wide',),
+            'fields': (('transporters', 'transport_cost'), 'dispatched'),
+        }),
+        ("Documents", {
+            'classes': ('documents-section',),
+            'fields': (
+                ('create_quote', 'view_quote', 'email_quote'),
+                ('create_proforma', 'view_proforma', 'email_proforma'),
+                ('create_invoice', 'view_invoice', 'email_invoice'),
+                ('create_picking_slip', 'view_picking_slip', 'email_picking_slip'),
+                ('create_delivery_note', 'view_delivery_note', 'email_delivery_note'),
+                'qty_for_invoice_data',
+            ),
+        }),
+    )
+    
+    # Fieldsets for HQ direct billing EDIT (existing records - includes view/email fields)
+    hq_direct_edit_fieldsets = (
+        (None, {
+            'fields': (('client', 'delivery_institution', 'base_number'),),
+        }),
+        ("Dates", {
+            'fields': (('billing_date', 'due_date'),),
+        }),
+        ("Financials", {
+            'fields': (('from_currency', 'to_currency', 'exchange_rate', 'vat_percentage'),),
+        }),
+        ("Billing Method", {
+            'classes': ('billing-method',),   
+            'fields': (('bill_per_primary', 'bill_per_secondary', 'bill_per_pallet'),),
+        }),
+        ("Transport", {
+            'classes': ('wide',),
+            'fields': (('transporters', 'transport_cost'), 'dispatched'),
+        }),
+        ("Documents", {
+            'classes': ('documents-section',),
+            'fields': (
+                ('create_quote', 'view_quote', 'email_quote'),
+                ('create_proforma', 'view_proforma', 'email_proforma'),
+                ('create_invoice', 'view_invoice', 'email_invoice'),
+                ('create_picking_slip', 'view_picking_slip', 'email_picking_slip'),
+                ('create_delivery_note', 'view_delivery_note', 'email_delivery_note'),
+                'qty_for_invoice_data',
+            ),
+        }),
+    )
+    
+    # Fieldsets for import view (matching site billing layout with Documents in rows)
+    import_fieldsets = (
+        (None, {
+            'fields': (('site', 'invoice_number'), ('client', 'delivery_institution', 'base_number')),
+        }),
+        ("Dates", {
+            'fields': (('billing_date', 'due_date'),),
+        }),
+        ("Financials", {
+            'fields': (('from_currency', 'to_currency', 'exchange_rate', 'vat_percentage'),),
+        }),
+        ("Billing Method", {
+            'classes': ('billing-method',),   
+            'fields': (('bill_per_primary', 'bill_per_secondary', 'bill_per_pallet'),),
+        }),
+        ("Transport", {
+            'classes': ('wide',),
+            'fields': (('transporters', 'transport_cost'), 'dispatched'),
+        }),
+        ("Documents", {
+            'classes': ('documents-section',),
+            'fields': (
+                ('create_quote', 'view_quote', 'email_quote'),
+                ('create_proforma', 'view_proforma', 'email_proforma'),
+                ('create_invoice', 'view_invoice', 'email_invoice'),
+                ('create_picking_slip', 'view_picking_slip', 'email_picking_slip'),
+                ('create_delivery_note', 'view_delivery_note', 'email_delivery_note'),
+                'qty_for_invoice_data',
+            ),
+        }),
+    )
+    
+    # Fieldsets for viewing/editing imported records (read-only import source)
+    import_view_fieldsets = (
+        (None, {
+            'fields': (('get_import_source_display', 'import_source_invoice_number'), ('client', 'delivery_institution', 'base_number')),
+        }),
+        ("Dates", {
+            'fields': (('billing_date', 'due_date'),),
+        }),
+        ("Financials", {
+            'fields': (('from_currency', 'to_currency', 'exchange_rate', 'vat_percentage'),),
+        }),
+        ("Billing Method", {
+            'classes': ('billing-method',),   
+            'fields': (('bill_per_primary', 'bill_per_secondary', 'bill_per_pallet'),),
+        }),
+        ("Transport", {
+            'classes': ('wide',),
+            'fields': (('transporters', 'transport_cost'), 'dispatched'),
+        }),
+        ("Documents", {
+            'classes': ('documents-section',),
+            'fields': (
+                ('create_quote', 'view_quote', 'email_quote'),
+                ('create_proforma', 'view_proforma', 'email_proforma'),
+                ('create_invoice', 'view_invoice', 'email_invoice'),
+                ('create_picking_slip', 'view_picking_slip', 'email_picking_slip'),
+                ('create_delivery_note', 'view_delivery_note', 'email_delivery_note'),
+                'qty_for_invoice_data',
+            ),
+        }),
+    )
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(site__isnull=True)
+    
+    def get_urls(self):
+        """Add custom import URL"""
+        urls = super().get_urls()
+        custom_urls = [
+            path('import/add/', self.admin_site.admin_view(self.import_add_view), name='billingdocumentheader_import_add'),
+        ]
+        return custom_urls + urls
+    
+    def get_form(self, request, obj=None, **kwargs):
+        """Override to ensure readonly fields are available before form validation"""
+        # Get readonly fields early so they're available during fieldsets validation
+        # This must be done before calling super().get_form()
+        if 'fields' not in kwargs:
+            # Pre-populate readonly list for validation
+            if getattr(self, '_is_import_view', False) or getattr(self, '_is_hq_direct_add', False) or (obj and obj.pk):
+                # Temporarily set readonly_fields for the form creation
+                if not hasattr(self, '_original_readonly_fields'):
+                    self._original_readonly_fields = None
+                kwargs['readonly_fields'] = self.get_readonly_fields(request, obj)
+        
+        return super().get_form(request, obj, **kwargs)
+    
+    def import_add_view(self, request, form_url='', extra_context=None):
+        """Custom add view for import billing using ImportBillingForm"""
+        # Temporarily store the import flag
+        self._is_import_view = True
+        # Use the original import template (no inline)
+        self.change_form_template = 'admin/costing/billingdocumentheader/import_change_form.html'
+        try:
+            return self.add_view(request, form_url, extra_context)
+        finally:
+            self._is_import_view = False
+            self.change_form_template = None
+    
+    def add_view(self, request, form_url='', extra_context=None):
+        """Override add_view to handle HQ direct billing (not imports)"""
+        # If this is NOT an import view, it's HQ direct billing
+        # Set flag to ensure get_readonly_fields includes view/email methods
+        if not getattr(self, '_is_import_view', False):
+            self._is_hq_direct_add = True
+            self.change_form_template = 'hq_admin/hq_billing_change_form.html'
+        try:
+            return super().add_view(request, form_url, extra_context)
+        finally:
+            if hasattr(self, '_is_hq_direct_add'):
+                del self._is_hq_direct_add
+            self.change_form_template = None
+    
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        """Override change view to use appropriate template"""
+        try:
+            obj = self.get_object(request, object_id)
+            if obj and obj.site is None:
+                # Check if this is an imported record
+                if obj.import_source_site:
+                    # Imported record - use import template (no inline)
+                    self.change_form_template = 'admin/costing/billingdocumentheader/import_change_form.html'
+                else:
+                    # HQ direct billing - use template with inline
+                    self.change_form_template = 'hq_admin/hq_billing_change_form.html'
+            else:
+                self.change_form_template = None
+        except Exception:
+            pass
+        
+        try:
+            return super().change_view(request, object_id, form_url, extra_context)
+        finally:
+            self.change_form_template = None
+    
+    def get_form(self, request, obj=None, **kwargs):

@@ -188,7 +188,7 @@
                                 '<td style="padding:4px 10px; text-align:right;">' +
                                     '<input type="number" name="qty_for_invoice_' + idx + '" class="vIntegerField qty-for-invoice-input" data-batch-number="' + key + '" min="0" value="' + existingVal + '" style="width:80px; text-align:right;" />' +
                                 '</td>' +
-                                '<td style="padding:4px 10px; text-align:center; font-weight:600;">' + row.price_per_unit + '</td>' +
+                                '<td style="padding:4px 10px; text-align:center; font-weight:600;">' + (window.COMPANY_CURRENCY || 'R') + ' ' + row.price_per_unit + '</td>' +
                                 '<td style="padding:4px 10px; text-align:center;">' + (row.approved ? 'Yes' : 'No') + '</td>' +
                                 '</tr>';
                         });

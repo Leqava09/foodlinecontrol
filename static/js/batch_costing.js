@@ -56,14 +56,19 @@
 
         // Store numeric value only (for Django form submission)
         priceInput.value = sellingPrice.toFixed(2);
-        
-        // Add/update a visual currency label before the input if not already present
-        let currencyLabel = priceInput.previousElementSibling;
+        addCurrencyPrefixLabel(priceInput);
+    }
+
+    // Add a currency label span before any editable input, e.g. "R" before an amount field
+    function addCurrencyPrefixLabel(inputEl) {
+        if (!inputEl) return;
+        const CURRENCY = getCurrency();
+        let currencyLabel = inputEl.previousElementSibling;
         if (!currencyLabel || !currencyLabel.classList.contains('currency-prefix')) {
             currencyLabel = document.createElement('span');
             currencyLabel.classList.add('currency-prefix');
             currencyLabel.style.cssText = 'margin-right: 5px; font-weight: bold;';
-            priceInput.parentNode.insertBefore(currencyLabel, priceInput);
+            inputEl.parentNode.insertBefore(currencyLabel, inputEl);
         }
         currencyLabel.textContent = CURRENCY;
     }
@@ -127,6 +132,10 @@
         const markupPercentInput    = document.querySelector('input[name="markup_percentage"]');
         const markupPerUnitInput    = document.querySelector('input[name="markup_per_unit"]');
         const stockPriceInput       = document.querySelector('input[name="stock_item_price_use"]');
+
+        // Add dynamic currency labels next to Stock Item Price Use and Markup per Unit
+        addCurrencyPrefixLabel(stockPriceInput);
+        addCurrencyPrefixLabel(markupPerUnitInput);
 
         function attachListener(el) {
             if (!el) return;

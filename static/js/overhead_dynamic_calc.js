@@ -49,25 +49,25 @@
             // Update per week display
             var $perWeekCell = $row.find('[class*="per_week_display"] span, .field-per_week_display span');
             if ($perWeekCell.length) {
-                $perWeekCell.text('NAD ' + perWeek.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $perWeekCell.text((window.COMPANY_CURRENCY || 'R') + ' ' + perWeek.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
             }
             
             // Update per day display
             var $perDayCell = $row.find('[class*="per_day_display"] span, .field-per_day_display span');
             if ($perDayCell.length) {
-                $perDayCell.text('NAD ' + perDay.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $perDayCell.text((window.COMPANY_CURRENCY || 'R') + ' ' + perDay.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
             }
             
             // Update per hour display
             var $perHourCell = $row.find('[class*="per_hour_display"] span, .field-per_hour_display span');
             if ($perHourCell.length) {
-                $perHourCell.text('NAD ' + perHour.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $perHourCell.text((window.COMPANY_CURRENCY || 'R') + ' ' + perHour.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
             }
             
             // Update per unit display
             var $perUnitCell = $row.find('[class*="per_unit_display"] span, .field-per_unit_display span');
             if ($perUnitCell.length) {
-                $perUnitCell.text('NAD ' + perUnit.toLocaleString('en-ZA', {minimumFractionDigits: 4, maximumFractionDigits: 4}));
+                $perUnitCell.text((window.COMPANY_CURRENCY || 'R') + ' ' + perUnit.toLocaleString('en-ZA', {minimumFractionDigits: 4, maximumFractionDigits: 4}));
             }
             
             console.log('Calculated item:', prefix, 'perMonth:', perMonth, 'perUnit:', perUnit);
@@ -110,7 +110,7 @@
             // Update Fixed total display using specific ID
             var $fixedDisplay = $('#overhead-fixed-total');
             if ($fixedDisplay.length) {
-                $fixedDisplay.text('NAD ' + fixedTotal.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $fixedDisplay.text((window.COMPANY_CURRENCY || 'R') + ' ' + fixedTotal.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
                 console.log('✓ Updated Fixed total');
             } else {
                 console.warn('⚠ Fixed total field not found');
@@ -119,7 +119,7 @@
             // Update Variable total display using specific ID
             var $variableDisplay = $('#overhead-variable-total');
             if ($variableDisplay.length) {
-                $variableDisplay.text('NAD ' + variableTotal.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $variableDisplay.text((window.COMPANY_CURRENCY || 'R') + ' ' + variableTotal.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
                 console.log('✓ Updated Variable total');
             } else {
                 console.warn('⚠ Variable total field not found');
@@ -129,7 +129,7 @@
             var $grandTotalDisplay = $('#overhead-grand-total');
             if ($grandTotalDisplay.length) {
                 var color = grandTotal > 100000 ? 'darkred' : 'black';
-                $grandTotalDisplay.css('color', color).text('NAD ' + grandTotal.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $grandTotalDisplay.css('color', color).text((window.COMPANY_CURRENCY || 'R') + ' ' + grandTotal.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
                 console.log('✓ Updated Grand Total');
             } else {
                 console.warn('⚠ Grand Total field not found');
@@ -138,7 +138,7 @@
             // Update Price per Unit display using specific ID
             var $pricePerUnitDisplay = $('#overhead-price-per-unit');
             if ($pricePerUnitDisplay.length) {
-                var formattedPrice = pricePerUnit > 0 ? 'NAD ' + pricePerUnit.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-';
+                var formattedPrice = pricePerUnit > 0 ? (window.COMPANY_CURRENCY || 'R') + ' ' + pricePerUnit.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-';
                 $pricePerUnitDisplay.text(formattedPrice);
                 console.log('✓ Updated Price per Unit');
             } else {

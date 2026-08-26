@@ -70,7 +70,7 @@ class IncidentForm(forms.ModelForm):
             'incident_report',
             'is_archived',
         ]
-    
+        
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from tenants.models import Site

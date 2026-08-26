@@ -138,7 +138,7 @@
             firstRow += `<td style="border: 1px solid #ddd; padding: 8px; text-align: right; background-color: #c8e6c9; width: 90px; font-size: 12px;"><strong>${firstUsed.toFixed(2)}</strong></td>`;
             firstRow += `<td style="border: 1px solid #ddd; padding: 8px; text-align: right; background-color: #c8e6c9; width: 135px; font-size: 12px;"><strong>${cur} ${firstUsedCosting.toFixed(2)}</strong></td>`;
             firstRow += `<td style="border: 1px solid #ddd; padding: 8px; text-align: right; background-color: #fffacd; width: 135px; font-size: 12px;" rowspan="${group.length}"><strong>${cur} ${quotedValue.toFixed(2)}</strong></td>`;
-            firstRow += `<td style="border: 1px solid #ddd; padding: 8px; text-align: right; width: 80px; font-size: 11px;">${pricePerUnit.toFixed(4)}</td>`;
+            firstRow += `<td style="border: 1px solid #ddd; padding: 8px; text-align: right; width: 80px; font-size: 11px;">${cur} ${pricePerUnit.toFixed(4)}</td>`;
             firstRow += `<td style="border: 1px solid #ddd; padding: 8px; text-align: left; color: #666; width: 200px; font-size: 11px;">${firstBatchRef}</td>`;
             firstRow += '</tr>';
             rows.push(firstRow);
@@ -154,7 +154,7 @@
                 let detailRow = '<tr>';
                 detailRow += `<td style="border: 1px solid #ddd; padding: 8px; text-align: right; background-color: #c8e6c9; width: 90px; font-size: 12px;">${used.toFixed(2)}</td>`;
                 detailRow += `<td style="border: 1px solid #ddd; padding: 8px; text-align: right; background-color: #c8e6c9; width: 135px; font-size: 12px;">${cur} ${usedCosting.toFixed(2)}</td>`;
-                detailRow += `<td style="border: 1px solid #ddd; padding: 8px; text-align: right; width: 80px; font-size: 11px;">${containerPrice.toFixed(4)}</td>`;
+                detailRow += `<td style="border: 1px solid #ddd; padding: 8px; text-align: right; width: 80px; font-size: 11px;">${cur} ${containerPrice.toFixed(4)}</td>`;
                 detailRow += `<td style="border: 1px solid #ddd; padding: 8px; text-align: left; color: #666; width: 200px; font-size: 11px;">${batchRef}</td>`;
                 detailRow += '</tr>';
                 rows.push(detailRow);

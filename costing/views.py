@@ -1170,7 +1170,13 @@ def billing_document_preview(request, pk, doc_type):
             qty_mapping = get_qty_mapping(header.qty_for_invoice_data)
             entered_qty = qty_mapping.get(batch.batch_number, 0)
             
-            price_per_unit = approval.batch_price_per_unit or Decimal("0.00")
+            if header.import_source_site:
+                # HQ import: use the Selling Price entered on the import form
+                qty_data = header.qty_for_invoice_data or {}
+                selling_prices = qty_data.get('selling_prices', {}) if isinstance(qty_data, dict) else {}
+                price_per_unit = Decimal(str(selling_prices.get(batch.batch_number, approval.batch_price_per_unit or "0.00")))
+            else:
+                price_per_unit = approval.batch_price_per_unit or Decimal("0.00")
             
             # Get packaging info dynamically
             from product_details.models import ProductComponent
@@ -1296,7 +1302,10 @@ def billing_document_preview(request, pk, doc_type):
                         product = batch.product
                         
                         entered_qty = qty_mapping.get(batch.batch_number, 0)
-                        price_per_unit = approval.batch_price_per_unit or Decimal("0.00")
+                        # HQ import fallback: use the Selling Price entered on the import form
+                        qty_data = header.qty_for_invoice_data or {}
+                        selling_prices = qty_data.get('selling_prices', {}) if isinstance(qty_data, dict) else {}
+                        price_per_unit = Decimal(str(selling_prices.get(batch.batch_number, approval.batch_price_per_unit or "0.00")))
                         product_description = batch.product.product_name if batch.product else ""
                         product_sku = batch.product.sku if batch.product and batch.product.sku else ""
                         
