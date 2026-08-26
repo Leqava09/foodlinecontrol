@@ -136,7 +136,7 @@ function Deploy-Application {
     Write-Host "Deploying Foodline Control" -ForegroundColor Cyan
     Write-Host "============================================`n" -ForegroundColor Cyan
     
-    $deployScript = "cd $ProjectPath && bash deploy_investor_loan.sh"
+    $deployScript = "cd $ProjectPath && bash deploy.sh"
     
     Write-Host "Running deployment script on server...`n" -ForegroundColor Yellow
     ssh $ServerAlias $deployScript
