@@ -46,3 +46,6 @@ staticfiles/
 # OS
 .DS_Store
 Thumbs.db
+
+# Runtime-generated docx conversion artifacts
+media/**/*.fixed.docx
